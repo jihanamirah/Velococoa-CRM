@@ -8,16 +8,39 @@
 import { execute } from '@/lib/odoo';
 
 /**
- * Parser XML Odoo yang lebih tangguh untuk menangani respons dari Odoo 18.
+ * Ekstraktor nilai dari tag XML secara aman.
+ */
+function extractValue(xml: string): any {
+  const sMatch = xml.match(/<string>([\s\S]*?)<\/string>/);
+  if (sMatch) return sMatch[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  
+  const iMatch = xml.match(/<int>(-?\d+)<\/int>/);
+  if (iMatch) return parseInt(iMatch[1], 10);
+  
+  const bMatch = xml.match(/<boolean>([01])<\/boolean>/);
+  if (bMatch) return bMatch[1] === '1';
+
+  const dMatch = xml.match(/<double>([\d.]+)<\/double>/);
+  if (dMatch) return parseFloat(dMatch[1]);
+
+  // Handle Array (e.g. Many2one [id, name])
+  const arrayMatch = xml.match(/<array>[\s\S]*?<data>([\s\S]*?)<\/data>[\s\S]*?<\/array>/);
+  if (arrayMatch) {
+    const values = arrayMatch[1].match(/<value>[\s\S]*?<\/value>/g) || [];
+    return values.map(v => extractValue(v));
+  }
+
+  return null;
+}
+
+/**
+ * Parser XML Odoo yang lebih tangguh.
  */
 function parseOdooRecords(xml: string): any[] {
   const records: any[] = [];
   
-  // Mencari array data utama
-  const arrayMatch = xml.match(/<array>([\s\S]*?)<\/array>/);
-  if (!arrayMatch) return [];
-
-  const structMatches = arrayMatch[1].match(/<struct>[\s\S]*?<\/struct>/g) || [];
+  // Ambil semua struct yang ada di dalam array respons
+  const structMatches = xml.match(/<struct>[\s\S]*?<\/struct>/g) || [];
 
   for (const struct of structMatches) {
     const obj: any = {};
@@ -25,33 +48,17 @@ function parseOdooRecords(xml: string): any[] {
     
     for (const member of memberMatches) {
       const name = member.match(/<name>(.*?)<\/name>/)?.[1];
-      if (!name) continue;
-
-      const valuePart = member.match(/<value>([\s\S]*?)<\/value>/)?.[1] || '';
-      let value: any = null;
-
-      const sMatch = valuePart.match(/<string>([\s\S]*?)<\/string>/);
-      const iMatch = valuePart.match(/<int>(-?\d+)<\/int>/);
-      const bMatch = valuePart.match(/<boolean>([01])<\/boolean>/);
-      const aMatch = valuePart.match(/<array>([\s\S]*?)<\/array>/);
-
-      if (aMatch) {
-        // Deteksi Many2one (Array: [id, name])
-        const s = aMatch[1].match(/<string>([\s\S]*?)<\/string>/);
-        if (s) value = s[1];
-        else {
-          const i = aMatch[1].match(/<int>(-?\d+)<\/int>/);
-          if (i) value = parseInt(i[1], 10);
-        }
-      } else if (sMatch) {
-        value = sMatch[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<');
-      } else if (iMatch) {
-        value = parseInt(iMatch[1], 10);
-      } else if (bMatch) {
-        value = bMatch[1] === '1';
-      }
+      const valuePart = member.match(/<value>([\s\S]*?)<\/value>/)?.[1];
       
-      obj[name] = value;
+      if (name && valuePart !== undefined) {
+        const val = extractValue(valuePart);
+        // Jika Many2one, ambil string label-nya saja untuk kemudahan UI
+        if (Array.isArray(val) && val.length === 2) {
+          obj[name] = val[1];
+        } else {
+          obj[name] = val;
+        }
+      }
     }
     records.push(obj);
   }
@@ -65,7 +72,8 @@ export async function getOdooLeads() {
       limit: 100,
       order: 'create_date desc'
     });
-    return parseOdooRecords(rawXml);
+    const records = parseOdooRecords(rawXml);
+    return records;
   } catch (error) {
     console.error('getOdooLeads failed:', error);
     return [];
@@ -88,6 +96,7 @@ export async function createOdooLead(data: any) {
     const idMatch = resXml.match(/<int>(\d+)<\/int>/);
     return idMatch ? { success: true, id: idMatch[1] } : { success: false };
   } catch (error: any) {
+    console.error('createOdooLead failed:', error);
     return { success: false, error: error.message };
   }
 }
@@ -113,16 +122,20 @@ export async function updateOdooLeadStage(id: number, status: string) {
       'Dihubungi': 'Proposition'
     };
 
-    const targetStage = statusMap[status] || status;
-    const searchXml = await execute('crm.stage', 'search', [[['name', 'ilike', targetStage]]]);
-    const stageMatch = searchXml.match(/<int>(\d+)<\/int>/);
+    const targetStageName = statusMap[status] || status;
+    
+    // Cari ID Stage berdasarkan nama
+    const searchStageXml = await execute('crm.stage', 'search', [[['name', 'ilike', targetStageName]]]);
+    const stageIdMatch = searchStageXml.match(/<int>(\d+)<\/int>/);
 
-    if (stageMatch) {
-      await execute('crm.lead', 'write', [[id], { stage_id: parseInt(stageMatch[1], 10) }]);
+    if (stageIdMatch) {
+      await execute('crm.lead', 'write', [[id], { stage_id: parseInt(stageIdMatch[1], 10) }]);
       return { success: true };
     }
-    return { success: false, error: 'Stage tidak ditemukan' };
+    
+    return { success: false, error: `Stage '${targetStageName}' tidak ditemukan di Odoo.` };
   } catch (error: any) {
+    console.error('updateOdooLeadStage failed:', error);
     return { success: false, error: error.message };
   }
 }
