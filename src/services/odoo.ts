@@ -86,6 +86,17 @@ export async function createOdooLead(data: any) {
   }
 }
 
+/**
+ * Alias atau wrapper untuk sinkronisasi manual dari halaman detail.
+ */
+export async function syncLeadToOdoo(lead: any) {
+  const result = await createOdooLead(lead);
+  if (result.success) {
+    return { success: true, odooId: result.id };
+  }
+  return result;
+}
+
 export async function updateOdooLeadStage(id: number, status: string) {
   try {
     if (status === 'Won') {
