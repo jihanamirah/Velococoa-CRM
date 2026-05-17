@@ -75,6 +75,22 @@ function mapOdooToLead(odoo: any): Lead {
     mappedStatus = 'Lost';
   }
 
+  // Parse volume and promo from description (HTML or text)
+  const jmlPesananMatch = description.match(/Jumlah Pesanan\s*:\s*(.*?)(?:<|$|\n|\r)/i);
+  const volumeMatch = description.match(/Estimasi Volume\s*:\s*(.*?)(?:<|$|\n|\r)/i);
+  let parsedVolume = 'Belum diketahui';
+  if (jmlPesananMatch && jmlPesananMatch[1].trim()) {
+    parsedVolume = jmlPesananMatch[1].trim();
+  } else if (volumeMatch && volumeMatch[1].trim()) {
+    parsedVolume = volumeMatch[1].trim();
+  }
+
+  const promoMatch = description.match(/Promo Minat\s*:\s*(.*?)(?:<|$|\n|\r)/i);
+  let parsedPromo = 'Tidak ada promo spesifik';
+  if (promoMatch && promoMatch[1].trim()) {
+    parsedPromo = promoMatch[1].trim();
+  }
+
   return {
     id: String(odoo.id),
     namaLengkap: String(odoo.contact_name || 'Tanpa Nama'),
@@ -96,6 +112,8 @@ function mapOdooToLead(odoo: any): Lead {
     catatanInternal: '',
     sumber: 'Odoo CRM',
     createdAt: String(odoo.create_date || new Date().toISOString()),
+    estimasiVolume: parsedVolume,
+    promoMinat: parsedPromo
   };
 }
 
