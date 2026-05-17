@@ -48,6 +48,23 @@ export interface Lead {
   estimasiVolume?: string;
 }
 
+function cleanDescription(desc: string): string {
+  if (!desc) return '';
+  // 1. Remove "Jumlah Pesanan : [value]"
+  let cleaned = desc.replace(/Jumlah Pesanan\s*:\s*.*?(?:<br\s*\/?>|<p>|<\/p>|\n|\r|$)/gi, '');
+  // 2. Remove AI Suggested Segment lines
+  cleaned = cleaned.replace(/AI Suggested Segment:.*?(?:\n|\r|$)/gi, '');
+  cleaned = cleaned.replace(/Reasoning:.*?(?:\n|\r|$)/gi, '');
+  // 3. Remove "Other Information:" or lines of underscores
+  cleaned = cleaned.replace(/Other Information\s*:\s*/gi, '');
+  cleaned = cleaned.replace(/____+/g, '');
+  // 4. Strip remaining HTML tags
+  cleaned = cleaned.replace(/<[^>]*>/g, ' ');
+  // 5. Clean up multiple spaces or newlines
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  return cleaned;
+}
+
 function mapOdooToLead(odoo: any): Lead {
   const description = String(odoo.description || '');
   const stageData = Array.isArray(odoo.stage_id) ? odoo.stage_id : [0, 'Unassigned'];
@@ -108,7 +125,7 @@ function mapOdooToLead(odoo: any): Lead {
     aiSuggestedSegment: description.match(/AI Suggested Segment: (.*?)\n/)?.[1] || 'Lainnya',
     aiFollowUpPriority: odoo.priority === '3' ? 'High' : odoo.priority === '2' ? 'Medium' : 'Low',
     aiReasoning: description.match(/Reasoning: (.*?)\n/)?.[1] || '',
-    catatan: description,
+    catatan: cleanDescription(description),
     catatanInternal: '',
     sumber: 'Odoo CRM',
     createdAt: String(odoo.create_date || new Date().toISOString()),
