@@ -42,25 +42,29 @@ function mapOdooToLead(odoo: any): Lead {
     else if (stage.includes('prop') || stage.includes('hubungi') || stage.includes('contact')) status = 'Dihubungi';
   }
 
+  // Odoo XML-RPC returns boolean false for empty strings.
+  // We must ensure description is a string before using .match()
+  const description = typeof odoo.description === 'string' ? odoo.description : '';
+
   return {
     id: String(odoo.id),
-    namaLengkap: odoo.contact_name || 'Tanpa Nama',
-    namaPerusahaan: odoo.name || 'Untitled Opportunity',
-    email: odoo.email_from || '',
-    telepon: odoo.phone || '',
-    kota: odoo.city || '',
-    kategoriBisnis: odoo.description?.match(/AI Suggested Segment: (.*?)\n/)?.[1] || 'Lainnya',
+    namaLengkap: (typeof odoo.contact_name === 'string' ? odoo.contact_name : '') || 'Tanpa Nama',
+    namaPerusahaan: (typeof odoo.name === 'string' ? odoo.name : '') || 'Untitled Opportunity',
+    email: (typeof odoo.email_from === 'string' ? odoo.email_from : '') || '',
+    telepon: (typeof odoo.phone === 'string' ? odoo.phone : '') || '',
+    kota: (typeof odoo.city === 'string' ? odoo.city : '') || '',
+    kategoriBisnis: description.match(/AI Suggested Segment: (.*?)\n/)?.[1] || 'Lainnya',
     promoMinat: '',
     estimasiVolume: '',
-    catatan: odoo.description || '',
+    catatan: description,
     catatanInternal: '',
     status: status,
     sumber: 'Langsung',
     sudahSyncOdoo: true,
     odooLeadId: String(odoo.id),
     aiFollowUpPriority: odoo.priority === '3' ? 'High' : odoo.priority === '2' ? 'Medium' : 'Low',
-    aiReasoning: odoo.description?.match(/Reasoning: (.*?)\n/)?.[1] || '',
-    createdAt: odoo.create_date || new Date().toISOString(),
+    aiReasoning: description.match(/Reasoning: (.*?)\n/)?.[1] || '',
+    createdAt: (typeof odoo.create_date === 'string' ? odoo.create_date : '') || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 }
