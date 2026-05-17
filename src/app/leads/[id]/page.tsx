@@ -45,6 +45,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [email, setEmail] = useState('');
   const [telepon, setTelepon] = useState('');
   const [kota, setKota] = useState('');
+  const [kategoriBisnis, setKategoriBisnis] = useState('');
   const [catatan, setCatatan] = useState('');
   const [catatanInternal, setCatatanInternal] = useState('');
 
@@ -57,6 +58,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         setEmail(l.email || '');
         setTelepon(l.telepon || '');
         setKota(l.kota || '');
+        setKategoriBisnis(l.kategoriBisnis || 'Lainnya');
         setCatatan(l.catatan || '');
         setCatatanInternal(l.catatanInternal || '');
       }
@@ -87,6 +89,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       email,
       telepon,
       kota,
+      kategoriBisnis,
       catatan
     });
     if (updated) {
@@ -242,7 +245,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                         ) : (
                           <div className="font-semibold">{lead.namaPerusahaan}</div>
                         )}
-                        <div className="text-sm text-muted-foreground mt-1">{lead.kategoriBisnis}</div>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
@@ -312,6 +314,23 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                           />
                         ) : (
                           <div className="font-semibold">{lead.telepon}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10 text-primary mt-1">
+                        <Sparkles className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Kategori Bisnis</div>
+                        {isEditing ? (
+                          <Input 
+                            className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                            value={kategoriBisnis} 
+                            onChange={(e) => setKategoriBisnis(e.target.value)} 
+                          />
+                        ) : (
+                          <div className="font-semibold">{lead.kategoriBisnis || 'Lainnya'}</div>
                         )}
                       </div>
                     </div>

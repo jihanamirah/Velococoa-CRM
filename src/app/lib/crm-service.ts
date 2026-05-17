@@ -50,17 +50,21 @@ export interface Lead {
 
 function cleanDescription(desc: string): string {
   if (!desc) return '';
-  // 1. Remove "Jumlah Pesanan : [value]"
-  let cleaned = desc.replace(/Jumlah Pesanan\s*:\s*.*?(?:<br\s*\/?>|<p>|<\/p>|\n|\r|$)/gi, '');
-  // 2. Remove AI Suggested Segment lines
+  // 1. Remove "Kota/Wilayah : ..." up to next field or tag
+  let cleaned = desc.replace(/Kota\/Wilayah\s*:\s*.*?(?=\s*(?:Kategori Bisnis|Jumlah Pesanan|$|\n|\r|<))/gi, '');
+  // 2. Remove "Kategori Bisnis : ..." up to next field or tag
+  cleaned = cleaned.replace(/Kategori Bisnis\s*:\s*.*?(?=\s*(?:Jumlah Pesanan|Kota\/Wilayah|$|\n|\r|<))/gi, '');
+  // 3. Remove "Jumlah Pesanan : [value]"
+  cleaned = cleaned.replace(/Jumlah Pesanan\s*:\s*.*?(?:<br\s*\/?>|<p>|<\/p>|\n|\r|$)/gi, '');
+  // 4. Remove AI Suggested Segment lines
   cleaned = cleaned.replace(/AI Suggested Segment:.*?(?:\n|\r|$)/gi, '');
   cleaned = cleaned.replace(/Reasoning:.*?(?:\n|\r|$)/gi, '');
-  // 3. Remove "Other Information:" or lines of underscores
+  // 5. Remove "Other Information:" or lines of underscores
   cleaned = cleaned.replace(/Other Information\s*:\s*/gi, '');
   cleaned = cleaned.replace(/____+/g, '');
-  // 4. Strip remaining HTML tags
+  // 6. Strip remaining HTML tags
   cleaned = cleaned.replace(/<[^>]*>/g, ' ');
-  // 5. Clean up multiple spaces or newlines
+  // 7. Clean up multiple spaces or newlines
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
   return cleaned;
 }
@@ -92,6 +96,20 @@ function mapOdooToLead(odoo: any): Lead {
     mappedStatus = 'Lost';
   }
 
+  // Parse location (Kota/Wilayah) from description or fallback to odoo city
+  const kotaMatch = description.match(/Kota\/Wilayah\s*:\s*(.*?)(?=\s*(?:Kategori Bisnis|Jumlah Pesanan|$|\n|\r|<))/i);
+  let parsedKota = odoo.city ? String(odoo.city) : '';
+  if (kotaMatch && kotaMatch[1].trim()) {
+    parsedKota = kotaMatch[1].trim();
+  }
+
+  // Parse category (Kategori Bisnis) from description or fallback to suggested segment
+  const katMatch = description.match(/Kategori Bisnis\s*:\s*(.*?)(?=\s*(?:Jumlah Pesanan|Kota\/Wilayah|$|\n|\r|<))/i);
+  let parsedKat = description.match(/AI Suggested Segment: (.*?)\n/)?.[1] || 'Lainnya';
+  if (katMatch && katMatch[1].trim()) {
+    parsedKat = katMatch[1].trim();
+  }
+
   // Parse volume and promo from description (HTML or text)
   const jmlPesananMatch = description.match(/Jumlah Pesanan\s*:\s*(.*?)(?:<|$|\n|\r)/i);
   const volumeMatch = description.match(/Estimasi Volume\s*:\s*(.*?)(?:<|$|\n|\r)/i);
@@ -114,8 +132,8 @@ function mapOdooToLead(odoo: any): Lead {
     namaPerusahaan: String(odoo.name || 'Opportunity'),
     email: String(odoo.email_from || ''),
     telepon: String(odoo.phone || ''),
-    kota: String(odoo.city || ''),
-    kategoriBisnis: description.match(/AI Suggested Segment: (.*?)\n/)?.[1] || 'Lainnya',
+    kota: parsedKota,
+    kategoriBisnis: parsedKat,
     status: mappedStatus,
     stageId: stageData[0],
     probability: Number(odoo.probability || 0),
@@ -300,6 +318,7 @@ export async function updateLeadDetails(leadId: string, updates: Partial<Lead>):
     if (updates.email !== undefined) fsUpdates.email = updates.email;
     if (updates.telepon !== undefined) fsUpdates.telepon = updates.telepon;
     if (updates.kota !== undefined) fsUpdates.kota = updates.kota;
+    if (updates.kategoriBisnis !== undefined) fsUpdates.kategoriBisnis = updates.kategoriBisnis;
     if (updates.catatan !== undefined) fsUpdates.catatan = updates.catatan;
     if (updates.catatanInternal !== undefined) fsUpdates.catatanInternal = updates.catatanInternal;
 
