@@ -12,7 +12,6 @@ const PASSWORD = 'aspk60';
 
 /**
  * Helper to parse Odoo XML response for basic lists of objects.
- * Note: A full XML parser would be better, but we use regex for zero-dependency simplicity in this prototype.
  */
 function parseOdooRecords(xml: string): any[] {
   const records: any[] = [];
@@ -24,9 +23,16 @@ function parseOdooRecords(xml: string): any[] {
     for (const member of memberMatches) {
       const name = member.match(/<name>(.*?)<\/name>/)?.[1];
       let value: any = null;
-      if (member.includes('<string>')) value = member.match(/<string>(.*?)<\/string>/)?.[1];
-      else if (member.includes('<int>')) value = parseInt(member.match(/<int>(\d+)<\/int>/)?.[1] || '0', 10);
-      else if (member.includes('<boolean>')) value = member.match(/<boolean>(\d+)<\/boolean>/)?.[1] === '1';
+      
+      // Odoo often returns [id, name] for many2one fields.
+      // We'll prioritize strings for status mapping, or ints for IDs.
+      const stringMatch = member.match(/<string>(.*?)<\/string>/);
+      const intMatch = member.match(/<int>(-?\d+)<\/int>/);
+      const boolMatch = member.match(/<boolean>(\d+)<\/boolean>/);
+      
+      if (stringMatch) value = stringMatch[1];
+      else if (intMatch) value = parseInt(intMatch[1], 10);
+      else if (boolMatch) value = boolMatch[1] === '1';
       
       if (name) obj[name] = value;
     }
@@ -39,7 +45,8 @@ export async function getOdooLeads() {
   try {
     const rawXml = await execute('crm.lead', 'search_read', [[]], {
       fields: ['id', 'name', 'contact_name', 'email_from', 'phone', 'city', 'description', 'stage_id', 'type', 'priority', 'create_date'],
-      limit: 50
+      limit: 100,
+      order: 'create_date desc'
     });
     return parseOdooRecords(rawXml);
   } catch (error) {
@@ -51,12 +58,12 @@ export async function getOdooLeads() {
 export async function createOdooLead(data: any) {
   try {
     const resultXml = await execute('crm.lead', 'create', [{
-      name: data.namaPerusahaan || 'New Lead',
+      name: data.namaPerusahaan || 'New Lead from CRM App',
       contact_name: data.namaLengkap,
       email_from: data.email,
       phone: data.telepon,
       city: data.kota,
-      description: `AI Suggested Segment: ${data.aiSuggestedSegment || 'N/A'}\nReasoning: ${data.aiReasoning || 'N/A'}\nNotes: ${data.catatan || ''}`,
+      description: `AI Suggested Segment: ${data.aiSuggestedSegment || 'N/A'}\nReasoning: ${data.aiReasoning || 'N/A'}\n\nNotes: ${data.catatan || ''}`,
       type: 'opportunity',
       priority: data.aiFollowUpPriority === 'High' ? '3' : '1'
     }]);
@@ -68,17 +75,47 @@ export async function createOdooLead(data: any) {
   }
 }
 
-export async function updateOdooLeadStage(id: number, stageName: string) {
+export async function updateOdooLeadStage(id: number, status: string) {
   try {
-    // In Odoo 18, we typically set probability or use stage_id
-    // For simplicity, we'll mark as won/lost using standard methods if applicable
-    if (stageName === 'Won') {
+    if (status === 'Won') {
       await execute('crm.lead', 'action_set_won', [[id]]);
-    } else if (stageName === 'Lost') {
+      return { success: true };
+    } 
+    
+    if (status === 'Lost') {
       await execute('crm.lead', 'action_set_lost', [[id]]);
+      return { success: true };
     }
-    return { success: true };
+
+    // Map internal status to Odoo standard stage names
+    const statusMap: Record<string, string> = {
+      'Baru': 'New',
+      'Qualified': 'Qualified',
+      'Dihubungi': 'Proposition' // Common Odoo 18 stage name for contacted leads
+    };
+
+    const targetStageName = statusMap[status] || status;
+
+    // 1. Find the Stage ID in Odoo based on the name
+    const searchStageXml = await execute('crm.stage', 'search', [[['name', 'ilike', targetStageName]]]);
+    const stageIdMatch = searchStageXml.match(/<int>(\d+)<\/int>/);
+
+    if (stageIdMatch) {
+      const stageId = parseInt(stageIdMatch[1], 10);
+      // 2. Update the lead's stage_id
+      await execute('crm.lead', 'write', [[id], { stage_id: stageId }]);
+      return { success: true };
+    } else {
+      // Fallback: try to write standard IDs if name search fails (usually 1=New, 2=Qualified, 3=Proposition)
+      const fallbackIds: Record<string, number> = { 'Baru': 1, 'Qualified': 2, 'Dihubungi': 3 };
+      if (fallbackIds[status]) {
+        await execute('crm.lead', 'write', [[id], { stage_id: fallbackIds[status] }]);
+        return { success: true };
+      }
+      throw new Error(`Stage "${targetStageName}" tidak ditemukan di Odoo.`);
+    }
   } catch (error: any) {
+    console.error('updateOdooLeadStage error:', error);
     return { success: false, error: error.message };
   }
 }

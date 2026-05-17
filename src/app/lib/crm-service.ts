@@ -27,17 +27,19 @@ export interface Lead {
   updatedAt: string;
 }
 
-// Mapper to convert Odoo lead to our App Lead type
+/**
+ * Mapper to convert Odoo lead to our App Lead type
+ */
 function mapOdooToLead(odoo: any): Lead {
   let status: LeadStatus = 'Baru';
+  
   if (odoo.stage_id) {
-    // Basic mapping based on stage names (case insensitive)
     const stage = String(odoo.stage_id).toLowerCase();
-    if (stage.includes('new')) status = 'Baru';
+    if (stage.includes('new') || stage.includes('baru')) status = 'Baru';
     else if (stage.includes('qualified')) status = 'Qualified';
-    else if (stage.includes('won')) status = 'Won';
-    else if (stage.includes('lost')) status = 'Lost';
-    else status = 'Dihubungi';
+    else if (stage.includes('won') || stage.includes('berhasil')) status = 'Won';
+    else if (stage.includes('lost') || stage.includes('gagal')) status = 'Lost';
+    else if (stage.includes('prop') || stage.includes('hubungi') || stage.includes('contact')) status = 'Dihubungi';
   }
 
   return {
@@ -47,7 +49,7 @@ function mapOdooToLead(odoo: any): Lead {
     email: odoo.email_from || '',
     telepon: odoo.phone || '',
     kota: odoo.city || '',
-    kategoriBisnis: 'Hotel & Korporasi', // Default or parsed from desc
+    kategoriBisnis: odoo.description?.match(/AI Suggested Segment: (.*?)\n/)?.[1] || 'Hotel & Korporasi',
     promoMinat: '',
     estimasiVolume: '',
     catatan: odoo.description || '',
@@ -56,6 +58,8 @@ function mapOdooToLead(odoo: any): Lead {
     sumber: 'Langsung',
     sudahSyncOdoo: true,
     odooLeadId: String(odoo.id),
+    aiFollowUpPriority: odoo.priority === '3' ? 'High' : odoo.priority === '2' ? 'Medium' : 'Low',
+    aiReasoning: odoo.description?.match(/Reasoning: (.*?)\n/)?.[1] || '',
     createdAt: odoo.create_date || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -79,7 +83,7 @@ export async function createLead(input: Partial<Lead>): Promise<Lead> {
     updatedAt: new Date().toISOString(),
   };
 
-  // Run AI analysis
+  // Run AI analysis for segmentation & priority
   try {
     const aiResult = await aiLeadSegmentationAndPrioritization({
       namaLengkap: input.namaLengkap || '',
@@ -100,7 +104,7 @@ export async function createLead(input: Partial<Lead>): Promise<Lead> {
     console.error('AI Analysis failed:', err);
   }
 
-  // Create in Odoo
+  // Create directly in Odoo
   const odooRes = await createOdooLead(newLead);
   if (odooRes.success) {
     newLead.id = odooRes.id;
@@ -114,6 +118,7 @@ export async function createLead(input: Partial<Lead>): Promise<Lead> {
 export async function updateLeadStatus(id: string, status: LeadStatus): Promise<Lead | undefined> {
   const result = await updateOdooLeadStage(parseInt(id, 10), status);
   if (result.success) {
+    // Return updated lead by refetching from Odoo
     return getLeadById(id);
   }
   return undefined;
