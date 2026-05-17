@@ -27,6 +27,9 @@ export interface Lead {
   updatedAt: string;
 }
 
+/**
+ * Mapping data Odoo crm.lead ke interface Lead lokal aplikasi.
+ */
 function mapOdooToLead(odoo: any): Lead {
   let status: LeadStatus = 'Baru';
   
@@ -64,7 +67,6 @@ function mapOdooToLead(odoo: any): Lead {
 
 export async function getLeads(): Promise<Lead[]> {
   const odooLeads = await getOdooLeads();
-  console.log(`Fetched ${odooLeads.length} leads from Odoo.`);
   return odooLeads.map(mapOdooToLead);
 }
 

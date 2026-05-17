@@ -8,12 +8,16 @@
 import { execute } from '@/lib/odoo';
 
 /**
- * Parser XML Odoo yang lebih tangguh.
- * Menangani tipe data dasar dan field relasional (many2one).
+ * Parser XML Odoo yang lebih tangguh untuk menangani respons dari Odoo 18.
  */
 function parseOdooRecords(xml: string): any[] {
   const records: any[] = [];
-  const structMatches = xml.match(/<struct>[\s\S]*?<\/struct>/g) || [];
+  
+  // Mencari array data utama
+  const arrayMatch = xml.match(/<array>([\s\S]*?)<\/array>/);
+  if (!arrayMatch) return [];
+
+  const structMatches = arrayMatch[1].match(/<struct>[\s\S]*?<\/struct>/g) || [];
 
   for (const struct of structMatches) {
     const obj: any = {};
@@ -26,22 +30,25 @@ function parseOdooRecords(xml: string): any[] {
       const valuePart = member.match(/<value>([\s\S]*?)<\/value>/)?.[1] || '';
       let value: any = null;
 
-      // Deteksi Many2one (Array: [id, name])
-      if (valuePart.includes('<array>')) {
-        const sMatch = valuePart.match(/<string>(.*?)<\/string>/);
-        if (sMatch) value = sMatch[1]; // Ambil nama string-nya
-        else {
-          const iMatch = valuePart.match(/<int>(-?\d+)<\/int>/);
-          if (iMatch) value = parseInt(iMatch[1], 10);
-        }
-      } else {
-        const s = valuePart.match(/<string>(.*?)<\/string>/);
-        const i = valuePart.match(/<int>(-?\d+)<\/int>/);
-        const b = valuePart.match(/<boolean>(\d+)<\/boolean>/);
-        
+      const sMatch = valuePart.match(/<string>([\s\S]*?)<\/string>/);
+      const iMatch = valuePart.match(/<int>(-?\d+)<\/int>/);
+      const bMatch = valuePart.match(/<boolean>([01])<\/boolean>/);
+      const aMatch = valuePart.match(/<array>([\s\S]*?)<\/array>/);
+
+      if (aMatch) {
+        // Deteksi Many2one (Array: [id, name])
+        const s = aMatch[1].match(/<string>([\s\S]*?)<\/string>/);
         if (s) value = s[1];
-        else if (i) value = parseInt(i[1], 10);
-        else if (b) value = b[1] === '1';
+        else {
+          const i = aMatch[1].match(/<int>(-?\d+)<\/int>/);
+          if (i) value = parseInt(i[1], 10);
+        }
+      } else if (sMatch) {
+        value = sMatch[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<');
+      } else if (iMatch) {
+        value = parseInt(iMatch[1], 10);
+      } else if (bMatch) {
+        value = bMatch[1] === '1';
       }
       
       obj[name] = value;
@@ -58,8 +65,7 @@ export async function getOdooLeads() {
       limit: 100,
       order: 'create_date desc'
     });
-    const records = parseOdooRecords(rawXml);
-    return records;
+    return parseOdooRecords(rawXml);
   } catch (error) {
     console.error('getOdooLeads failed:', error);
     return [];
@@ -86,15 +92,8 @@ export async function createOdooLead(data: any) {
   }
 }
 
-/**
- * Alias atau wrapper untuk sinkronisasi manual dari halaman detail.
- */
 export async function syncLeadToOdoo(lead: any) {
-  const result = await createOdooLead(lead);
-  if (result.success) {
-    return { success: true, odooId: result.id };
-  }
-  return result;
+  return await createOdooLead(lead);
 }
 
 export async function updateOdooLeadStage(id: number, status: string) {
