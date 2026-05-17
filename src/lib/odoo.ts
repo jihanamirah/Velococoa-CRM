@@ -1,6 +1,6 @@
 /**
- * @fileOverview Core Odoo XML-RPC Client Logic.
- * Provides a lightweight wrapper for calling Odoo 18 External API.
+ * @fileOverview Core Odoo 18 XML-RPC Client Logic.
+ * Menyediakan wrapper ringan untuk memanggil External API Odoo secara standar.
  */
 
 const ODOO_CONFIG = {
@@ -11,20 +11,25 @@ const ODOO_CONFIG = {
 };
 
 /**
- * Basic XML-RPC string builder for Odoo calls.
- * This handles simple types: strings, ints, booleans, and arrays/structs for basic params.
+ * Membangun string XML-RPC yang valid. 
+ * Semua nilai harus dibungkus dalam tag <value>.
  */
 function toXmlValue(val: any): string {
-  if (typeof val === 'string') return `<string>${val.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</string>`;
-  if (typeof val === 'number') return `<int>${Math.floor(val)}</int>`;
-  if (typeof val === 'boolean') return `<boolean>${val ? 1 : 0}</boolean>`;
-  if (Array.isArray(val)) {
-    return `<array><data>${val.map(toXmlValue).join('')}</data></array>`;
+  let inner = '';
+  if (typeof val === 'string') {
+    inner = `<string>${val.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</string>`;
+  } else if (typeof val === 'number') {
+    inner = `<int>${Math.floor(val)}</int>`;
+  } else if (typeof val === 'boolean') {
+    inner = `<boolean>${val ? 1 : 0}</boolean>`;
+  } else if (Array.isArray(val)) {
+    inner = `<array><data>${val.map(toXmlValue).join('')}</data></array>`;
+  } else if (typeof val === 'object' && val !== null) {
+    inner = `<struct>${Object.entries(val).map(([k, v]) => `<member><name>${k}</name>${toXmlValue(v)}</member>`).join('')}</struct>`;
+  } else {
+    inner = `<nil/>`;
   }
-  if (typeof val === 'object' && val !== null) {
-    return `<struct>${Object.entries(val).map(([k, v]) => `<member><name>${k}</name><value>${toXmlValue(v)}</value></member>`).join('')}</struct>`;
-  }
-  return `<nil/>`;
+  return `<value>${inner}</value>`;
 }
 
 async function xmlrpcCall(service: string, method: string, ...params: any[]) {
@@ -32,7 +37,7 @@ async function xmlrpcCall(service: string, method: string, ...params: any[]) {
     <methodCall>
       <methodName>${method}</methodName>
       <params>
-        ${params.map(p => `<param><value>${toXmlValue(p)}</value></param>`).join('')}
+        ${params.map(p => `<param>${toXmlValue(p)}</param>`).join('')}
       </params>
     </methodCall>`;
 
@@ -46,14 +51,11 @@ async function xmlrpcCall(service: string, method: string, ...params: any[]) {
     throw new Error(`Odoo API Error: ${response.statusText}`);
   }
 
-  const text = await response.text();
-  // Simple regex-based parsing for prototype (usually a library like xmlrpc is used)
-  // We'll focus on extracting common return types for this implementation.
-  return text;
+  return await response.text();
 }
 
 /**
- * Authenticate with Odoo and return UID.
+ * Otentikasi ke Odoo untuk mendapatkan User ID (UID).
  */
 export async function authenticate(): Promise<number | null> {
   try {
@@ -67,38 +69,11 @@ export async function authenticate(): Promise<number | null> {
 }
 
 /**
- * Execute a method on an Odoo model (ORM).
+ * Menjalankan metode pada model Odoo (ORM).
  */
 export async function execute(model: string, method: string, args: any[] = [], kwargs: any = {}): Promise<any> {
   const uid = await authenticate();
-  if (!uid) throw new Error('Authentication failed');
+  if (!uid) throw new Error('Otentikasi Odoo gagal. Periksa username/password.');
 
-  // Logic for Odoo's execute_kw
-  // Standard params: db, uid, password, model, method, args, kwargs
-  const body = `<?xml version="1.0"?>
-    <methodCall>
-      <methodName>execute_kw</methodName>
-      <params>
-        <param><value><string>${ODOO_CONFIG.db}</string></value></param>
-        <param><value><int>${uid}</int></value></param>
-        <param><value><string>${ODOO_CONFIG.password}</string></value></param>
-        <param><value><string>${model}</string></value></param>
-        <param><value><string>${method}</string></value></param>
-        <param><value>${toXmlValue(args)}</value></param>
-        <param><value>${toXmlValue(kwargs)}</value></param>
-      </params>
-    </methodCall>`;
-
-  const response = await fetch(`${ODOO_CONFIG.url}/xmlrpc/2/object`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/xml' },
-    body,
-  });
-
-  const text = await response.text();
-  
-  // Basic parsing of the return structure
-  if (text.includes('faultCode')) throw new Error('Odoo Server Fault: ' + text);
-
-  return text; 
+  return await xmlrpcCall('object', 'execute_kw', ODOO_CONFIG.db, uid, ODOO_CONFIG.password, model, method, args, kwargs);
 }

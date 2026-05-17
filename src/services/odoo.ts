@@ -2,16 +2,14 @@
 
 /**
  * @fileOverview Odoo 18 CRM Integration Service (Server Actions).
- * Handles the mapping between the app's Lead type and Odoo's crm.lead model.
+ * Menangani komunikasi antara aplikasi dan model crm.lead di Odoo.
  */
 
-import { authenticate, execute } from '@/lib/odoo';
-
-const DB = 'ASPK60';
-const PASSWORD = 'aspk60';
+import { execute } from '@/lib/odoo';
 
 /**
- * Helper to parse Odoo XML response for basic lists of objects.
+ * Parser XML Odoo yang lebih tangguh.
+ * Menangani tipe data dasar dan field relasional (many2one).
  */
 function parseOdooRecords(xml: string): any[] {
   const records: any[] = [];
@@ -20,21 +18,33 @@ function parseOdooRecords(xml: string): any[] {
   for (const struct of structMatches) {
     const obj: any = {};
     const memberMatches = struct.match(/<member>[\s\S]*?<\/member>/g) || [];
+    
     for (const member of memberMatches) {
       const name = member.match(/<name>(.*?)<\/name>/)?.[1];
+      if (!name) continue;
+
+      const valuePart = member.match(/<value>([\s\S]*?)<\/value>/)?.[1] || '';
       let value: any = null;
+
+      // Deteksi Many2one (Array: [id, name])
+      if (valuePart.includes('<array>')) {
+        const sMatch = valuePart.match(/<string>(.*?)<\/string>/);
+        if (sMatch) value = sMatch[1]; // Ambil nama string-nya
+        else {
+          const iMatch = valuePart.match(/<int>(-?\d+)<\/int>/);
+          if (iMatch) value = parseInt(iMatch[1], 10);
+        }
+      } else {
+        const s = valuePart.match(/<string>(.*?)<\/string>/);
+        const i = valuePart.match(/<int>(-?\d+)<\/int>/);
+        const b = valuePart.match(/<boolean>(\d+)<\/boolean>/);
+        
+        if (s) value = s[1];
+        else if (i) value = parseInt(i[1], 10);
+        else if (b) value = b[1] === '1';
+      }
       
-      // Odoo often returns [id, name] for many2one fields.
-      // We'll prioritize strings for status mapping, or ints for IDs.
-      const stringMatch = member.match(/<string>(.*?)<\/string>/);
-      const intMatch = member.match(/<int>(-?\d+)<\/int>/);
-      const boolMatch = member.match(/<boolean>(\d+)<\/boolean>/);
-      
-      if (stringMatch) value = stringMatch[1];
-      else if (intMatch) value = parseInt(intMatch[1], 10);
-      else if (boolMatch) value = boolMatch[1] === '1';
-      
-      if (name) obj[name] = value;
+      obj[name] = value;
     }
     records.push(obj);
   }
@@ -44,21 +54,22 @@ function parseOdooRecords(xml: string): any[] {
 export async function getOdooLeads() {
   try {
     const rawXml = await execute('crm.lead', 'search_read', [[]], {
-      fields: ['id', 'name', 'contact_name', 'email_from', 'phone', 'city', 'description', 'stage_id', 'type', 'priority', 'create_date'],
+      fields: ['id', 'name', 'contact_name', 'email_from', 'phone', 'city', 'description', 'stage_id', 'priority', 'create_date'],
       limit: 100,
       order: 'create_date desc'
     });
-    return parseOdooRecords(rawXml);
+    const records = parseOdooRecords(rawXml);
+    return records;
   } catch (error) {
-    console.error('getOdooLeads error:', error);
+    console.error('getOdooLeads failed:', error);
     return [];
   }
 }
 
 export async function createOdooLead(data: any) {
   try {
-    const resultXml = await execute('crm.lead', 'create', [{
-      name: data.namaPerusahaan || 'New Lead from CRM App',
+    const resXml = await execute('crm.lead', 'create', [{
+      name: data.namaPerusahaan || 'Opportunity Baru',
       contact_name: data.namaLengkap,
       email_from: data.email,
       phone: data.telepon,
@@ -68,8 +79,8 @@ export async function createOdooLead(data: any) {
       priority: data.aiFollowUpPriority === 'High' ? '3' : '1'
     }]);
     
-    const match = resultXml.match(/<int>(\d+)<\/int>/);
-    return match ? { success: true, id: match[1] } : { success: false };
+    const idMatch = resXml.match(/<int>(\d+)<\/int>/);
+    return idMatch ? { success: true, id: idMatch[1] } : { success: false };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -81,45 +92,27 @@ export async function updateOdooLeadStage(id: number, status: string) {
       await execute('crm.lead', 'action_set_won', [[id]]);
       return { success: true };
     } 
-    
     if (status === 'Lost') {
       await execute('crm.lead', 'action_set_lost', [[id]]);
       return { success: true };
     }
 
-    // Map internal status to Odoo standard stage names
     const statusMap: Record<string, string> = {
       'Baru': 'New',
       'Qualified': 'Qualified',
-      'Dihubungi': 'Proposition' // Common Odoo 18 stage name for contacted leads
+      'Dihubungi': 'Proposition'
     };
 
-    const targetStageName = statusMap[status] || status;
+    const targetStage = statusMap[status] || status;
+    const searchXml = await execute('crm.stage', 'search', [[['name', 'ilike', targetStage]]]);
+    const stageMatch = searchXml.match(/<int>(\d+)<\/int>/);
 
-    // 1. Find the Stage ID in Odoo based on the name
-    const searchStageXml = await execute('crm.stage', 'search', [[['name', 'ilike', targetStageName]]]);
-    const stageIdMatch = searchStageXml.match(/<int>(\d+)<\/int>/);
-
-    if (stageIdMatch) {
-      const stageId = parseInt(stageIdMatch[1], 10);
-      // 2. Update the lead's stage_id
-      await execute('crm.lead', 'write', [[id], { stage_id: stageId }]);
+    if (stageMatch) {
+      await execute('crm.lead', 'write', [[id], { stage_id: parseInt(stageMatch[1], 10) }]);
       return { success: true };
-    } else {
-      // Fallback: try to write standard IDs if name search fails (usually 1=New, 2=Qualified, 3=Proposition)
-      const fallbackIds: Record<string, number> = { 'Baru': 1, 'Qualified': 2, 'Dihubungi': 3 };
-      if (fallbackIds[status]) {
-        await execute('crm.lead', 'write', [[id], { stage_id: fallbackIds[status] }]);
-        return { success: true };
-      }
-      throw new Error(`Stage "${targetStageName}" tidak ditemukan di Odoo.`);
     }
+    return { success: false, error: 'Stage tidak ditemukan' };
   } catch (error: any) {
-    console.error('updateOdooLeadStage error:', error);
     return { success: false, error: error.message };
   }
-}
-
-export async function syncLeadToOdoo(lead: any) {
-  return createOdooLead(lead);
 }

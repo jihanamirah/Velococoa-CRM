@@ -27,9 +27,6 @@ export interface Lead {
   updatedAt: string;
 }
 
-/**
- * Mapper to convert Odoo lead to our App Lead type
- */
 function mapOdooToLead(odoo: any): Lead {
   let status: LeadStatus = 'Baru';
   
@@ -44,12 +41,12 @@ function mapOdooToLead(odoo: any): Lead {
 
   return {
     id: String(odoo.id),
-    namaLengkap: odoo.contact_name || 'No Name',
+    namaLengkap: odoo.contact_name || 'Tanpa Nama',
     namaPerusahaan: odoo.name || 'Untitled Opportunity',
     email: odoo.email_from || '',
     telepon: odoo.phone || '',
     kota: odoo.city || '',
-    kategoriBisnis: odoo.description?.match(/AI Suggested Segment: (.*?)\n/)?.[1] || 'Hotel & Korporasi',
+    kategoriBisnis: odoo.description?.match(/AI Suggested Segment: (.*?)\n/)?.[1] || 'Lainnya',
     promoMinat: '',
     estimasiVolume: '',
     catatan: odoo.description || '',
@@ -67,6 +64,7 @@ function mapOdooToLead(odoo: any): Lead {
 
 export async function getLeads(): Promise<Lead[]> {
   const odooLeads = await getOdooLeads();
+  console.log(`Fetched ${odooLeads.length} leads from Odoo.`);
   return odooLeads.map(mapOdooToLead);
 }
 
@@ -83,7 +81,6 @@ export async function createLead(input: Partial<Lead>): Promise<Lead> {
     updatedAt: new Date().toISOString(),
   };
 
-  // Run AI analysis for segmentation & priority
   try {
     const aiResult = await aiLeadSegmentationAndPrioritization({
       namaLengkap: input.namaLengkap || '',
@@ -104,7 +101,6 @@ export async function createLead(input: Partial<Lead>): Promise<Lead> {
     console.error('AI Analysis failed:', err);
   }
 
-  // Create directly in Odoo
   const odooRes = await createOdooLead(newLead);
   if (odooRes.success) {
     newLead.id = odooRes.id;
@@ -118,7 +114,6 @@ export async function createLead(input: Partial<Lead>): Promise<Lead> {
 export async function updateLeadStatus(id: string, status: LeadStatus): Promise<Lead | undefined> {
   const result = await updateOdooLeadStage(parseInt(id, 10), status);
   if (result.success) {
-    // Return updated lead by refetching from Odoo
     return getLeadById(id);
   }
   return undefined;
