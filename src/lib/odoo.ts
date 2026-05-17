@@ -1,6 +1,6 @@
 /**
  * @fileOverview Core Odoo 18 XML-RPC Client Logic.
- * Menyediakan wrapper ringan untuk memanggil External API Odoo secara standar.
+ * Menyediakan wrapper untuk memanggil External API Odoo secara standar.
  */
 
 const ODOO_CONFIG = {
@@ -10,18 +10,14 @@ const ODOO_CONFIG = {
   password: 'aspk60',
 };
 
-/**
- * Membangun string XML-RPC yang valid. 
- * Semua nilai harus dibungkus dalam tag <value>.
- */
 function toXmlValue(val: any): string {
-  if (val === null || val === undefined) return '<value><nil/></value>';
+  if (val === null || val === undefined || val === false) return '<value><nil/></value>';
   
   let inner = '';
   if (typeof val === 'string') {
     inner = `<string>${val.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</string>`;
   } else if (typeof val === 'number') {
-    inner = `<int>${Math.floor(val)}</int>`;
+    inner = val % 1 === 0 ? `<int>${val}</int>` : `<double>${val}</double>`;
   } else if (typeof val === 'boolean') {
     inner = `<boolean>${val ? 1 : 0}</boolean>`;
   } else if (Array.isArray(val)) {
@@ -56,17 +52,9 @@ async function xmlrpcCall(service: string, method: string, ...params: any[]) {
     throw new Error(`Odoo HTTP Error: ${response.status} ${response.statusText}`);
   }
 
-  const text = await response.text();
-  if (text.includes('<fault>')) {
-    throw new Error(`Odoo XML-RPC Fault: ${text}`);
-  }
-  
-  return text;
+  return await response.text();
 }
 
-/**
- * Otentikasi ke Odoo untuk mendapatkan User ID (UID).
- */
 export async function authenticate(): Promise<number | null> {
   try {
     const res = await xmlrpcCall('common', 'authenticate', ODOO_CONFIG.db, ODOO_CONFIG.username, ODOO_CONFIG.password, {});
@@ -78,13 +66,10 @@ export async function authenticate(): Promise<number | null> {
   }
 }
 
-/**
- * Menjalankan metode pada model Odoo (ORM).
- */
 export async function execute(model: string, method: string, args: any[] = [], kwargs: any = {}): Promise<any> {
   const uid = await authenticate();
   if (!uid) {
-    throw new Error('Authentication failed. Please check your Odoo credentials.');
+    throw new Error('Authentication failed. Check your Odoo credentials.');
   }
 
   return await xmlrpcCall('object', 'execute_kw', ODOO_CONFIG.db, uid, ODOO_CONFIG.password, model, method, args, kwargs);

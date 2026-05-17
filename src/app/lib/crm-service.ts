@@ -1,4 +1,7 @@
-import { aiLeadSegmentationAndPrioritization } from '@/ai/flows/ai-lead-segmentation-and-prioritization-flow';
+/**
+ * @fileOverview Adapter layer between Odoo ERP and VeloCocoa CRM UI.
+ */
+
 import { 
   getOdooLeads, 
   getOdooStages, 
@@ -41,30 +44,30 @@ export interface Lead {
 }
 
 function mapOdooToLead(odoo: any): Lead {
-  const description = (typeof odoo.description === 'string' ? odoo.description : '') || '';
-  const stageData = Array.isArray(odoo.stage_id) ? odoo.stage_id : [0, 'Unknown'];
+  const description = String(odoo.description || '');
+  const stageData = Array.isArray(odoo.stage_id) ? odoo.stage_id : [0, 'Unassigned'];
 
   return {
     id: String(odoo.id),
-    namaLengkap: (typeof odoo.contact_name === 'string' ? odoo.contact_name : '') || 'Tanpa Nama',
-    namaPerusahaan: (typeof odoo.name === 'string' ? odoo.name : '') || 'Untitled Opportunity',
-    email: (typeof odoo.email_from === 'string' ? odoo.email_from : '') || '',
-    telepon: (typeof odoo.phone === 'string' ? odoo.phone : '') || '',
-    kota: (typeof odoo.city === 'string' ? odoo.city : '') || '',
+    namaLengkap: String(odoo.contact_name || 'Tanpa Nama'),
+    namaPerusahaan: String(odoo.name || 'Opportunity'),
+    email: String(odoo.email_from || ''),
+    telepon: String(odoo.phone || ''),
+    kota: String(odoo.city || ''),
     kategoriBisnis: description.match(/AI Suggested Segment: (.*?)\n/)?.[1] || 'Lainnya',
     status: stageData[1],
     stageId: stageData[0],
-    probability: typeof odoo.probability === 'number' ? odoo.probability : 0,
+    probability: Number(odoo.probability || 0),
     active: odoo.active !== false,
     sudahSyncOdoo: true,
     odooLeadId: String(odoo.id),
     aiSuggestedSegment: description.match(/AI Suggested Segment: (.*?)\n/)?.[1] || 'Lainnya',
     aiFollowUpPriority: odoo.priority === '3' ? 'High' : odoo.priority === '2' ? 'Medium' : 'Low',
     aiReasoning: description.match(/Reasoning: (.*?)\n/)?.[1] || '',
-    catatan: description.match(/Notes: ([\s\S]*)/)?.[1] || description,
+    catatan: description,
     catatanInternal: '',
     sumber: 'Odoo CRM',
-    createdAt: (typeof odoo.create_date === 'string' ? odoo.create_date : '') || new Date().toISOString(),
+    createdAt: String(odoo.create_date || new Date().toISOString()),
   };
 }
 
@@ -111,31 +114,17 @@ export async function updateLeadStatus(leadId: string, newStatus: LeadStatus): P
     success = res.success;
   } else {
     const stages = await getStages();
-    const targetStage = stages.find(s => s.name.toLowerCase().includes(newStatus.toLowerCase()));
-    if (targetStage) {
-      const res = await updateOdooLeadStage(idInt, targetStage.id);
+    const target = stages.find(s => s.name.toLowerCase().includes(newStatus.toLowerCase()));
+    if (target) {
+      const res = await updateOdooLeadStage(idInt, target.id);
       success = res.success;
     }
   }
 
-  if (success) {
-    return await getLeadById(leadId);
-  }
+  if (success) return await getLeadById(leadId);
   return null;
 }
 
 export async function createLead(input: any): Promise<any> {
-  let aiResult = { suggestedBusinessSegment: 'Lainnya', followUpPriority: 'Low', reasoning: '' };
-  try {
-    aiResult = await aiLeadSegmentationAndPrioritization(input);
-  } catch (err) {
-    console.error('AI Analysis failed:', err);
-  }
-
-  return await createOdooLead({
-    ...input,
-    aiSuggestedSegment: aiResult.suggestedBusinessSegment,
-    aiFollowUpPriority: aiResult.followUpPriority,
-    aiReasoning: aiResult.reasoning
-  });
+  return await createOdooLead(input);
 }
