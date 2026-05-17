@@ -24,7 +24,7 @@ import {
   History
 } from 'lucide-react';
 import { getLeadById, updateLeadStatus, Lead, LeadStatus } from '@/app/lib/crm-service';
-import { syncLeadToOdoo } from '@/app/lib/odoo-client';
+import { syncLeadToOdoo } from '@/services/odoo';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -58,14 +58,26 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const handleOdooSync = async () => {
     if (!lead) return;
     setIsSyncing(true);
-    const result = await syncLeadToOdoo(lead);
-    setIsSyncing(false);
-    if (result.success) {
-      setLead({ ...lead, sudahSyncOdoo: true, odooLeadId: result.odooId });
+    
+    try {
+      const result = await syncLeadToOdoo(lead);
+      if (result.success) {
+        setLead({ ...lead, sudahSyncOdoo: true, odooLeadId: result.odooId });
+        toast({
+          title: "Sinkronisasi Berhasil",
+          description: `Lead telah dikirim ke Odoo dengan ID: ${result.odooId}`,
+        });
+      } else {
+        throw new Error(result.error || "Gagal sinkronisasi");
+      }
+    } catch (error: any) {
       toast({
-        title: "Sinkronisasi Berhasil",
-        description: `Lead telah dikirim ke Odoo dengan ID: ${result.odooId}`,
+        variant: "destructive",
+        title: "Sinkronisasi Gagal",
+        description: error.message,
       });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -77,8 +89,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       <div className="space-y-6 animate-in fade-in duration-500 pb-20">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => router.push('/leads')}>
-              <ArrowLeft className="h-5 w-5" />
+            <Button variant="ghost" size="icon" asChild>
+              <button onClick={() => router.push('/leads')}>
+                <ArrowLeft className="h-5 w-5" />
+              </button>
             </Button>
             <div>
               <div className="flex items-center gap-2 mb-1">
