@@ -3,6 +3,7 @@ import { aiLeadSegmentationAndPrioritization } from '@/ai/flows/ai-lead-segmenta
 import { 
   getOdooLeads, 
   getOdooStages, 
+  getOdooLeadById,
   createOdooLead, 
   updateOdooLeadStage, 
   setOdooLeadWon, 
@@ -14,6 +15,8 @@ export interface OdooStage {
   name: string;
   sequence: number;
 }
+
+export type LeadStatus = 'Baru' | 'Dihubungi' | 'Qualified' | 'Won' | 'Lost';
 
 export interface Lead {
   id: string;
@@ -29,8 +32,12 @@ export interface Lead {
   active: boolean;
   sudahSyncOdoo: boolean;
   odooLeadId: string;
+  aiSuggestedSegment: string;
   aiFollowUpPriority: string;
   aiReasoning: string;
+  catatan: string;
+  catatanInternal: string;
+  sumber: string;
   createdAt: string;
 }
 
@@ -55,8 +62,12 @@ function mapOdooToLead(odoo: any): Lead {
     active: odoo.active !== false,
     sudahSyncOdoo: true,
     odooLeadId: String(odoo.id),
+    aiSuggestedSegment: description.match(/AI Suggested Segment: (.*?)\n/)?.[1] || 'Lainnya',
     aiFollowUpPriority: odoo.priority === '3' ? 'High' : odoo.priority === '2' ? 'Medium' : 'Low',
     aiReasoning: description.match(/Reasoning: (.*?)\n/)?.[1] || '',
+    catatan: description.match(/Notes: ([\s\S]*)/)?.[1] || description,
+    catatanInternal: '',
+    sumber: 'Odoo CRM',
     createdAt: (typeof odoo.create_date === 'string' ? odoo.create_date : '') || new Date().toISOString(),
   };
 }
@@ -64,6 +75,11 @@ function mapOdooToLead(odoo: any): Lead {
 export async function getLeads(): Promise<Lead[]> {
   const odooLeads = await getOdooLeads();
   return odooLeads.map(mapOdooToLead);
+}
+
+export async function getLeadById(id: string): Promise<Lead | null> {
+  const odooLead = await getOdooLeadById(parseInt(id, 10));
+  return odooLead ? mapOdooToLead(odooLead) : null;
 }
 
 export async function getStages(): Promise<OdooStage[]> {
@@ -85,6 +101,32 @@ export async function markWon(leadId: string) {
 
 export async function markLost(leadId: string) {
   return await setOdooLeadLost(parseInt(leadId, 10));
+}
+
+export async function updateLeadStatus(leadId: string, newStatus: LeadStatus): Promise<Lead | null> {
+  const id = parseInt(leadId, 10);
+  let success = false;
+  
+  if (newStatus === 'Won') {
+    const res = await setOdooLeadWon(id);
+    success = res.success;
+  } else if (newStatus === 'Lost') {
+    const res = await setOdooLeadLost(id);
+    success = res.success;
+  } else {
+    const stages = await getStages();
+    // Cari stage yang namanya mirip dengan status target (Baru, Dihubungi, Qualified)
+    const targetStage = stages.find(s => s.name.toLowerCase().includes(newStatus.toLowerCase()));
+    if (targetStage) {
+      const res = await updateOdooLeadStage(id, targetStage.id);
+      success = res.success;
+    }
+  }
+
+  if (success) {
+    return await getLeadById(leadId);
+  }
+  return null;
 }
 
 export async function createLead(input: any): Promise<any> {
