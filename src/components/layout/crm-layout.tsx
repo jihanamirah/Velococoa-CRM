@@ -29,9 +29,10 @@ import {
   SidebarProvider,
   SidebarTrigger 
 } from "@/components/ui/sidebar";
-import { collection, query, onSnapshot, addDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { getLeads } from '@/app/lib/crm-service';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
@@ -43,6 +44,72 @@ const navItems = [
 export function CRMLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
+  const initialLoadRef = useRef(true);
+  const cacheRef = useRef<Record<string, string>>({}); // Maps leadId -> status
+
+  useEffect(() => {
+    let intervalId: any;
+    
+    const syncOdooRealtime = async () => {
+      try {
+        const currentLeads = await getLeads();
+        
+        if (initialLoadRef.current) {
+          const newCache: Record<string, string> = {};
+          currentLeads.forEach(l => {
+            newCache[l.id] = l.status;
+          });
+          cacheRef.current = newCache;
+          initialLoadRef.current = false;
+          return;
+        }
+        
+        for (const l of currentLeads) {
+          const prevStatus = cacheRef.current[l.id];
+          
+          if (prevStatus === undefined) {
+            // New lead detected in Odoo!
+            const notifRef = doc(db, "notifications", `new_lead_${l.id}`);
+            const notifSnap = await getDoc(notifRef);
+            if (!notifSnap.exists()) {
+              await setDoc(notifRef, {
+                type: 'lead_baru',
+                title: 'Lead Baru Masuk!',
+                body: `${l.namaLengkap} - ${l.namaPerusahaan}`,
+                createdAt: new Date(),
+                read: false,
+                color: 'text-blue-500 bg-blue-500/10'
+              });
+            }
+            cacheRef.current[l.id] = l.status;
+          } else if (prevStatus !== l.status) {
+            // Stage / status transition detected in Odoo!
+            const notifRef = doc(db, "notifications", `stage_change_${l.id}_${l.stageId}`);
+            const notifSnap = await getDoc(notifRef);
+            if (!notifSnap.exists()) {
+              await setDoc(notifRef, {
+                type: 'follow_up',
+                title: 'Tahap Lead Diperbarui',
+                body: `${l.namaLengkap} (${l.namaPerusahaan}) berpindah ke tahap ${l.status}`,
+                createdAt: new Date(),
+                read: false,
+                color: 'text-amber-500 bg-amber-500/10'
+              });
+            }
+            cacheRef.current[l.id] = l.status;
+          }
+        }
+      } catch (err) {
+        console.warn("Background sync error:", err);
+      }
+    };
+
+    // Sync immediately and poll every 30 seconds
+    syncOdooRealtime();
+    intervalId = setInterval(syncOdooRealtime, 30000);
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     const q = query(collection(db, "notifications"));
