@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -59,9 +58,6 @@ function parseOdooRecords(xml: string): any[] {
   return records;
 }
 
-/**
- * Mengambil semua stage pipeline dari Odoo.
- */
 export async function getOdooStages() {
   try {
     const rawXml = await execute('crm.stage', 'search_read', [[]], {
@@ -75,9 +71,6 @@ export async function getOdooStages() {
   }
 }
 
-/**
- * Mengambil semua leads dari Odoo.
- */
 export async function getOdooLeads() {
   try {
     const rawXml = await execute('crm.lead', 'search_read', [[]], {
@@ -96,9 +89,6 @@ export async function getOdooLeads() {
   }
 }
 
-/**
- * Mengambil detail lead berdasarkan ID.
- */
 export async function getOdooLeadById(id: number) {
   try {
     const rawXml = await execute('crm.lead', 'read', [[id]], {
@@ -116,9 +106,6 @@ export async function getOdooLeadById(id: number) {
   }
 }
 
-/**
- * Membuat lead baru di Odoo.
- */
 export async function createOdooLead(data: any) {
   try {
     const resXml = await execute('crm.lead', 'create', [{
@@ -135,61 +122,44 @@ export async function createOdooLead(data: any) {
     const idMatch = resXml.match(/<int>(\d+)<\/int>/);
     return idMatch ? { success: true, id: idMatch[1] } : { success: false };
   } catch (error: any) {
-    console.error('createOdooLead failed:', error);
     return { success: false, error: error.message };
   }
 }
 
-/**
- * Memperbarui stage lead di Odoo.
- */
 export async function updateOdooLeadStage(leadId: number, stageId: number) {
   try {
     await execute('crm.lead', 'write', [[leadId], { stage_id: stageId }]);
     return { success: true };
   } catch (error: any) {
-    console.error('updateOdooLeadStage failed:', error);
     return { success: false, error: error.message };
   }
 }
 
-/**
- * Menandai lead sebagai Won di Odoo.
- */
 export async function setOdooLeadWon(leadId: number) {
   try {
     await execute('crm.lead', 'action_set_won', [[leadId]]);
     return { success: true };
   } catch (error: any) {
-    console.error('setOdooLeadWon failed:', error);
     return { success: false, error: error.message };
   }
 }
 
-/**
- * Menandai lead sebagai Lost di Odoo.
- */
 export async function setOdooLeadLost(leadId: number) {
   try {
     await execute('crm.lead', 'action_set_lost', [[leadId]]);
     return { success: true };
   } catch (error: any) {
-    console.error('setOdooLeadLost failed:', error);
     return { success: false, error: error.message };
   }
 }
 
-/**
- * Fungsi sinkronisasi manual (wrapper untuk kelengkapan UI).
- */
 export async function syncLeadToOdoo(lead: any) {
   try {
-    // Lead yang sudah ada di aplikasi ini sebenarnya sudah tersinkron dengan Odoo
-    // Kita hanya perlu memastikan ID Odoo valid
-    if (lead.id) {
-      return { success: true, odooId: lead.id };
+    if (lead.odooLeadId) {
+      return { success: true, odooId: lead.odooLeadId };
     }
-    return { success: false, error: "ID Lead tidak valid" };
+    const res = await createOdooLead(lead);
+    return res;
   } catch (error) {
     return { success: false, error: "Gagal sinkronisasi" };
   }

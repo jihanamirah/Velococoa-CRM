@@ -1,4 +1,3 @@
-
 import { aiLeadSegmentationAndPrioritization } from '@/ai/flows/ai-lead-segmentation-and-prioritization-flow';
 import { 
   getOdooLeads, 
@@ -26,7 +25,7 @@ export interface Lead {
   telepon: string;
   kota: string;
   kategoriBisnis: string;
-  status: string; // Map to stage name
+  status: string;
   stageId: number;
   probability: number;
   active: boolean;
@@ -41,11 +40,8 @@ export interface Lead {
   createdAt: string;
 }
 
-/**
- * Mapping data Odoo crm.lead ke interface Lead lokal aplikasi.
- */
 function mapOdooToLead(odoo: any): Lead {
-  const description = typeof odoo.description === 'string' ? odoo.description : '';
+  const description = (typeof odoo.description === 'string' ? odoo.description : '') || '';
   const stageData = Array.isArray(odoo.stage_id) ? odoo.stage_id : [0, 'Unknown'];
 
   return {
@@ -104,21 +100,20 @@ export async function markLost(leadId: string) {
 }
 
 export async function updateLeadStatus(leadId: string, newStatus: LeadStatus): Promise<Lead | null> {
-  const id = parseInt(leadId, 10);
+  const idInt = parseInt(leadId, 10);
   let success = false;
   
   if (newStatus === 'Won') {
-    const res = await setOdooLeadWon(id);
+    const res = await setOdooLeadWon(idInt);
     success = res.success;
   } else if (newStatus === 'Lost') {
-    const res = await setOdooLeadLost(id);
+    const res = await setOdooLeadLost(idInt);
     success = res.success;
   } else {
     const stages = await getStages();
-    // Cari stage yang namanya mirip dengan status target (Baru, Dihubungi, Qualified)
     const targetStage = stages.find(s => s.name.toLowerCase().includes(newStatus.toLowerCase()));
     if (targetStage) {
-      const res = await updateOdooLeadStage(id, targetStage.id);
+      const res = await updateOdooLeadStage(idInt, targetStage.id);
       success = res.success;
     }
   }

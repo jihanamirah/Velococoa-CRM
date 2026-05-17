@@ -27,7 +27,7 @@ import {
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { getLeads, Lead } from '@/app/lib/crm-service';
-import { format, subDays, isSameDay, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
+import { format, subDays, isSameDay, eachDayOfInterval } from 'date-fns';
 import { id } from 'date-fns/locale';
 
 export default function DashboardPage() {
@@ -38,25 +38,26 @@ export default function DashboardPage() {
     getLeads().then((data) => {
       setLeads(data);
       setIsLoading(false);
+    }).catch(err => {
+      console.error(err);
+      setIsLoading(false);
     });
   }, []);
 
-  // Calculate real-time metrics from Odoo data
   const metrics = useMemo(() => {
     const totalLeads = leads.length;
-    const newLeads = leads.filter(l => l.status === 'Baru').length;
-    const inProgress = leads.filter(l => l.status === 'Dihubungi' || l.status === 'Qualified').length;
-    const wonLeads = leads.filter(l => l.status === 'Won').length;
+    const newLeads = leads.filter(l => l.status.toLowerCase().includes('new') || l.status.toLowerCase().includes('baru')).length;
+    const inProgress = leads.filter(l => l.active && !l.status.toLowerCase().includes('won') && !l.status.toLowerCase().includes('lost')).length;
+    const wonLeads = leads.filter(l => l.status.toLowerCase().includes('won') || l.status.toLowerCase().includes('berhasil')).length;
 
     return [
       { title: 'Total Opportunities', value: totalLeads.toString(), icon: Users, color: 'bg-primary/10 text-primary', sub: 'Semua pipeline di Odoo' },
       { title: 'New Leads', value: newLeads.toString(), icon: UserPlus, color: 'bg-blue-500/10 text-blue-500', sub: 'Butuh kualifikasi segera' },
-      { title: 'In Pipeline', value: inProgress.toString(), icon: Activity, color: 'bg-amber-500/10 text-amber-500', sub: 'Status: Dihubungi/Qualified' },
+      { title: 'In Pipeline', value: inProgress.toString(), icon: Activity, color: 'bg-amber-500/10 text-amber-500', sub: 'Proses aktif' },
       { title: 'Closed Won', value: wonLeads.toString(), icon: Trophy, color: 'bg-green-500/10 text-green-500', sub: 'Target Closing Bulan Ini' },
     ];
   }, [leads]);
 
-  // Aggregate leads by day for the chart
   const chartData = useMemo(() => {
     const last7Days = eachDayOfInterval({
       start: subDays(new Date(), 6),
@@ -83,7 +84,7 @@ export default function DashboardPage() {
       <CRMLayout>
         <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
           <Loader2 className="h-10 w-10 text-primary animate-spin" />
-          <p className="text-muted-foreground animate-pulse text-sm">Mengambil data dari Odoo ERP...</p>
+          <p className="text-muted-foreground animate-pulse text-sm">Mengambil data dari Odoo ERP ASPK60...</p>
         </div>
       </CRMLayout>
     );
@@ -95,11 +96,11 @@ export default function DashboardPage() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Sales Overview</h1>
-            <p className="text-muted-foreground">Monitoring sinkronisasi data real-time dari Odoo CRM.</p>
+            <p className="text-muted-foreground">Monitoring sinkronisasi data real-time dari Odoo 18.</p>
           </div>
           <div className="text-xs font-medium text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-full border flex items-center gap-2">
             <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-            Terhubung ke: <span className="text-foreground">ASPK60 Database</span>
+            Terhubung ke: <span className="text-foreground">ptrfserp.com (ASPK60)</span>
           </div>
         </div>
 
@@ -189,11 +190,11 @@ export default function DashboardPage() {
                       variant="secondary"
                       className={cn(
                         "text-[10px] px-2 py-0.5 border-none",
-                        lead.status === 'Baru' && 'bg-blue-500/10 text-blue-500',
-                        lead.status === 'Dihubungi' && 'bg-amber-500/10 text-amber-500',
-                        lead.status === 'Qualified' && 'bg-green-500/10 text-green-500',
-                        lead.status === 'Won' && 'bg-primary/10 text-primary',
-                        lead.status === 'Lost' && 'bg-red-500/10 text-red-500',
+                        (lead.status.toLowerCase().includes('new') || lead.status.toLowerCase().includes('baru')) && 'bg-blue-500/10 text-blue-500',
+                        (lead.status.toLowerCase().includes('contact') || lead.status.toLowerCase().includes('hubungi')) && 'bg-amber-500/10 text-amber-500',
+                        (lead.status.toLowerCase().includes('qualif')) && 'bg-green-500/10 text-green-500',
+                        (lead.status.toLowerCase().includes('won') || lead.status.toLowerCase().includes('berhasil')) && 'bg-primary/10 text-primary',
+                        (lead.status.toLowerCase().includes('lost') || lead.status.toLowerCase().includes('gagal')) && 'bg-red-500/10 text-red-500',
                       )}
                     >
                       {lead.status}
@@ -202,7 +203,7 @@ export default function DashboardPage() {
                 ))}
                 {recentLeads.length === 0 && (
                   <div className="p-8 text-center text-xs text-muted-foreground">
-                    Belum ada data opportunity.
+                    Belum ada data opportunity dari Odoo.
                   </div>
                 )}
               </div>

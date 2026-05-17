@@ -4,7 +4,7 @@
  */
 
 const ODOO_CONFIG = {
-  url: 'https://www.ptrfserp.com',
+  url: 'https://www.ptrfserp.com/',
   db: 'ASPK60',
   username: 'jihanamirahk1@gmail.com',
   password: 'aspk60',
@@ -41,7 +41,6 @@ async function xmlrpcCall(service: string, method: string, ...params: any[]) {
   </params>
 </methodCall>`;
 
-  // Pastikan URL tidak memiliki trailing slash ganda
   const baseUrl = ODOO_CONFIG.url.endsWith('/') ? ODOO_CONFIG.url.slice(0, -1) : ODOO_CONFIG.url;
   
   const response = await fetch(`${baseUrl}/xmlrpc/2/${service}`, {
