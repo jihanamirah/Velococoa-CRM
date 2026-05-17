@@ -7,13 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Bell, 
   Clock, 
-  CheckCircle2, 
   AlertCircle, 
   UserPlus, 
   Trash2,
   MoreVertical
 } from 'lucide-react';
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 
 const initialNotifications = [
   { id: '1', type: 'lead_baru', title: 'Lead Baru Masuk!', body: 'Kopi Kenangan Senja - Kafe & Kedai Kopi', date: '2 jam lalu', read: false, color: 'text-blue-500 bg-blue-500/10' },
@@ -94,8 +94,4 @@ export default function NotificationsPage() {
       </div>
     </CRMLayout>
   );
-}
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
 }

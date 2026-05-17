@@ -8,16 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
   Search, 
-  Filter, 
   MapPin, 
   Building2, 
   Calendar,
-  ChevronRight,
   Plus,
   RefreshCcw
 } from 'lucide-react';
 import Link from 'next/link';
 import { getLeads, Lead } from '@/app/lib/crm-service';
+import { cn } from '@/lib/utils';
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -45,11 +44,11 @@ export default function LeadsPage() {
             <h1 className="text-3xl font-bold tracking-tight">Daftar Leads</h1>
             <p className="text-muted-foreground">Kelola semua calon mitra PT VeloCocoa.</p>
           </div>
-          <Link href="/leads/new">
-            <Button className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20">
+          <Button className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20" asChild>
+            <Link href="/leads/new">
               <Plus className="mr-2 h-4 w-4" /> Tambah Lead Manual
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
 
         <div className="flex flex-col md:flex-row gap-4">
@@ -148,8 +147,4 @@ export default function LeadsPage() {
       </div>
     </CRMLayout>
   );
-}
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
 }

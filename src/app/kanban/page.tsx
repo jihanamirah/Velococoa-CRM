@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { getLeads, Lead, LeadStatus } from '@/app/lib/crm-service';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 const columns: LeadStatus[] = ['Baru', 'Dihubungi', 'Qualified', 'Won', 'Lost'];
 
@@ -98,8 +99,4 @@ export default function KanbanPage() {
       </div>
     </CRMLayout>
   );
-}
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
 }

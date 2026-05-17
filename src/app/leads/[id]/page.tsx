@@ -26,6 +26,7 @@ import {
 import { getLeadById, updateLeadStatus, Lead, LeadStatus } from '@/app/lib/crm-service';
 import { syncLeadToOdoo } from '@/app/lib/odoo-client';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -307,8 +308,4 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       </div>
     </CRMLayout>
   );
-}
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
 }

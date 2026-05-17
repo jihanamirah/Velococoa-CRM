@@ -3,6 +3,7 @@
 import { CRMLayout } from '@/components/layout/crm-layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { 
   Users, 
   UserPlus, 
@@ -13,8 +14,6 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { 
-  LineChart, 
-  Line, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -24,6 +23,7 @@ import {
   Area
 } from 'recharts';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 const chartData = [
   { name: 'Sen', leads: 4 },
@@ -121,11 +121,16 @@ export default function DashboardPage() {
                 <CardTitle>Recent Leads</CardTitle>
                 <CardDescription>Aktivitas terbaru</CardDescription>
               </div>
-              <Link href="/leads">
-                <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-primary hover:text-primary/80"
+                asChild
+              >
+                <Link href="/leads">
                   Lihat Semua <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border/50">
@@ -158,8 +163,4 @@ export default function DashboardPage() {
       </div>
     </CRMLayout>
   );
-}
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
 }
