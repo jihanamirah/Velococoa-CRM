@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { 
   ArrowLeft, 
   MapPin, 
@@ -21,9 +22,10 @@ import {
   RefreshCcw,
   Sparkles,
   MessageSquare,
-  History
+  History,
+  User
 } from 'lucide-react';
-import { getLeadById, updateLeadStatus, Lead, LeadStatus } from '@/app/lib/crm-service';
+import { getLeadById, updateLeadStatus, updateLeadDetails, Lead, LeadStatus } from '@/app/lib/crm-service';
 import { syncLeadToOdoo } from '@/services/odoo';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -36,15 +38,35 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Editable fields states
+  const [isEditing, setIsEditing] = useState(false);
+  const [namaPerusahaan, setNamaPerusahaan] = useState('');
+  const [namaLengkap, setNamaLengkap] = useState('');
+  const [email, setEmail] = useState('');
+  const [telepon, setTelepon] = useState('');
+  const [kota, setKota] = useState('');
+  const [catatan, setCatatan] = useState('');
+  const [catatanInternal, setCatatanInternal] = useState('');
+
   useEffect(() => {
     getLeadById(resolvedParams.id).then((l) => {
-      if (l) setLead(l);
+      if (l) {
+        setLead(l);
+        setNamaPerusahaan(l.namaPerusahaan || '');
+        setNamaLengkap(l.namaLengkap || '');
+        setEmail(l.email || '');
+        setTelepon(l.telepon || '');
+        setKota(l.kota || '');
+        setCatatan(l.catatan || '');
+        setCatatanInternal(l.catatanInternal || '');
+      }
       setIsLoading(false);
     });
   }, [resolvedParams.id]);
 
   const handleStatusChange = async (newStatus: LeadStatus) => {
     if (!lead) return;
+    setIsLoading(true);
     const updated = await updateLeadStatus(lead.id, newStatus);
     if (updated) {
       setLead(updated);
@@ -53,6 +75,57 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         description: `Lead sekarang berstatus: ${newStatus}`,
       });
     }
+    setIsLoading(false);
+  };
+
+  const handleSaveDetails = async () => {
+    if (!lead) return;
+    setIsLoading(true);
+    const updated = await updateLeadDetails(lead.id, {
+      namaPerusahaan,
+      namaLengkap,
+      email,
+      telepon,
+      kota,
+      catatan
+    });
+    if (updated) {
+      setLead(updated);
+      setIsEditing(false);
+      toast({
+        title: "Data Diperbarui",
+        description: "Detail lead berhasil disinkronkan ke Odoo CRM & Firestore secara realtime.",
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Gagal Menyimpan",
+        description: "Gagal menyelaraskan data baru ke Odoo CRM.",
+      });
+    }
+    setIsLoading(false);
+  };
+
+  const handleUpdateNotes = async () => {
+    if (!lead) return;
+    setIsLoading(true);
+    const updated = await updateLeadDetails(lead.id, {
+      catatanInternal
+    });
+    if (updated) {
+      setLead(updated);
+      toast({
+        title: "Catatan Diperbarui",
+        description: "Catatan internal sales berhasil disimpan ke Odoo & Firestore secara realtime.",
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Gagal Memperbarui Catatan",
+        description: "Gagal menyimpan catatan sales ke Odoo.",
+      });
+    }
+    setIsLoading(false);
   };
 
   const handleOdooSync = async () => {
@@ -89,10 +162,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       <div className="space-y-6 animate-in fade-in duration-500 pb-20">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild>
-              <button onClick={() => router.push('/leads')}>
-                <ArrowLeft className="h-5 w-5" />
-              </button>
+            <Button variant="ghost" size="icon" onClick={() => router.push('/leads')}>
+              <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -102,6 +173,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     "text-[10px] px-2 py-0.5 font-bold uppercase tracking-widest border-none",
                     lead.status === 'Baru' && 'bg-blue-500/10 text-blue-500',
                     lead.status === 'Dihubungi' && 'bg-amber-500/10 text-amber-500',
+                    lead.status === 'Negotiation' && 'bg-purple-500/10 text-purple-500',
                     lead.status === 'Qualified' && 'bg-green-500/10 text-green-500',
                     lead.status === 'Won' && 'bg-primary/20 text-primary',
                     lead.status === 'Lost' && 'bg-red-500/10 text-red-500',
@@ -136,8 +208,21 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <Card className="border-none shadow-xl bg-card/40 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-xl">Detail Profil</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl">Detail Profil</CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground mt-0.5">Informasi kontak mitra.</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  {isEditing ? (
+                    <>
+                      <Button size="sm" className="bg-[#2D6A4F] hover:bg-[#1B4332] text-white" onClick={handleSaveDetails}>Simpan</Button>
+                      <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => setIsEditing(false)}>Batal</Button>
+                    </>
+                  ) : (
+                    <Button size="sm" variant="outline" className="border-[#C17B3A]/40 text-[#C17B3A] hover:bg-[#C17B3A]/10" onClick={() => setIsEditing(true)}>Edit Profil</Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -146,19 +231,52 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       <div className="p-2 rounded-lg bg-primary/10 text-primary mt-1">
                         <Building2 className="h-4 w-4" />
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Perusahaan</div>
-                        <div className="font-semibold">{lead.namaPerusahaan}</div>
-                        <div className="text-sm text-muted-foreground">{lead.kategoriBisnis}</div>
+                        {isEditing ? (
+                          <Input 
+                            className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                            value={namaPerusahaan} 
+                            onChange={(e) => setNamaPerusahaan(e.target.value)} 
+                          />
+                        ) : (
+                          <div className="font-semibold">{lead.namaPerusahaan}</div>
+                        )}
+                        <div className="text-sm text-muted-foreground mt-1">{lead.kategoriBisnis}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10 text-primary mt-1">
+                        <User className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Penanggung Jawab</div>
+                        {isEditing ? (
+                          <Input 
+                            className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                            value={namaLengkap} 
+                            onChange={(e) => setNamaLengkap(e.target.value)} 
+                          />
+                        ) : (
+                          <div className="font-semibold">{lead.namaLengkap}</div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
                       <div className="p-2 rounded-lg bg-primary/10 text-primary mt-1">
                         <MapPin className="h-4 w-4" />
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Lokasi</div>
-                        <div className="font-semibold">{lead.kota}</div>
+                        {isEditing ? (
+                          <Input 
+                            className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                            value={kota} 
+                            onChange={(e) => setKota(e.target.value)} 
+                          />
+                        ) : (
+                          <div className="font-semibold">{lead.kota}</div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -167,18 +285,34 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       <div className="p-2 rounded-lg bg-primary/10 text-primary mt-1">
                         <Mail className="h-4 w-4" />
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Email</div>
-                        <div className="font-semibold">{lead.email}</div>
+                        {isEditing ? (
+                          <Input 
+                            className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                            value={email} 
+                            onChange={(e) => setEmail(e.target.value)} 
+                          />
+                        ) : (
+                          <div className="font-semibold">{lead.email}</div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
                       <div className="p-2 rounded-lg bg-primary/10 text-primary mt-1">
                         <Phone className="h-4 w-4" />
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Telepon</div>
-                        <div className="font-semibold">{lead.telepon}</div>
+                        {isEditing ? (
+                          <Input 
+                            className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                            value={telepon} 
+                            onChange={(e) => setTelepon(e.target.value)} 
+                          />
+                        ) : (
+                          <div className="font-semibold">{lead.telepon}</div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -203,9 +337,17 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
                 <div>
                   <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wider font-semibold">Catatan Mitra</div>
-                  <div className="p-4 rounded-xl bg-muted/20 text-sm leading-relaxed">
-                    {lead.catatan || 'Tidak ada catatan tambahan.'}
-                  </div>
+                  {isEditing ? (
+                    <Textarea 
+                      className="bg-background/50 min-h-[80px] border-primary/20 focus-visible:ring-primary" 
+                      value={catatan} 
+                      onChange={(e) => setCatatan(e.target.value)} 
+                    />
+                  ) : (
+                    <div className="p-4 rounded-xl bg-muted/20 text-sm leading-relaxed">
+                      {lead.catatan || 'Tidak ada catatan tambahan.'}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -221,10 +363,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 <Textarea 
                   placeholder="Tambahkan observasi sales atau hasil meeting..." 
                   className="bg-background/50 min-h-[120px]"
-                  defaultValue={lead.catatanInternal}
+                  value={catatanInternal}
+                  onChange={(e) => setCatatanInternal(e.target.value)}
                 />
                 <div className="flex justify-end">
-                   <Button size="sm">Update Catatan</Button>
+                   <Button size="sm" className="bg-[#C17B3A] hover:bg-[#A0642D] text-white" onClick={handleUpdateNotes}>Update Catatan</Button>
                 </div>
               </CardContent>
             </Card>
@@ -236,6 +379,13 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 onClick={() => handleStatusChange('Dihubungi')}
                >
                  Tandai Dihubungi
+               </Button>
+               <Button 
+                variant="outline" 
+                className="flex-1 min-w-[150px] border-purple-500/50 text-purple-500 hover:bg-purple-500/5"
+                onClick={() => handleStatusChange('Negotiation')}
+               >
+                 Tandai Negosiasi
                </Button>
                <Button 
                 variant="outline" 

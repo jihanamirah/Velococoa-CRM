@@ -4,10 +4,10 @@
  */
 
 const ODOO_CONFIG = {
-  url: 'https://www.ptrfserp.com/',
-  db: 'ASPK60',
-  username: 'jihanamirahk1@gmail.com',
-  password: 'aspk60',
+  url: process.env.ODOO_URL || 'https://www.ptrfserp.com/',
+  db: process.env.ODOO_DB || 'ASPK60',
+  username: process.env.ODOO_USERNAME || 'jihanamirahk1@gmail.com',
+  password: process.env.ODOO_PASSWORD || 'aspk60',
 };
 
 function toXmlValue(val: any): string {

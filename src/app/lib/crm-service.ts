@@ -9,8 +9,11 @@ import {
   createOdooLead, 
   updateOdooLeadStage, 
   setOdooLeadWon, 
-  setOdooLeadLost 
+  setOdooLeadLost,
+  updateOdooLeadDetails
 } from '@/services/odoo';
+import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export interface OdooStage {
   id: number;
@@ -18,7 +21,7 @@ export interface OdooStage {
   sequence: number;
 }
 
-export type LeadStatus = 'Baru' | 'Dihubungi' | 'Qualified' | 'Won' | 'Lost';
+export type LeadStatus = 'Baru' | 'Dihubungi' | 'Negotiation' | 'Qualified' | 'Won' | 'Lost';
 
 export interface Lead {
   id: string;
@@ -41,11 +44,36 @@ export interface Lead {
   catatanInternal: string;
   sumber: string;
   createdAt: string;
+  promoMinat?: string;
+  estimasiVolume?: string;
 }
 
 function mapOdooToLead(odoo: any): Lead {
   const description = String(odoo.description || '');
   const stageData = Array.isArray(odoo.stage_id) ? odoo.stage_id : [0, 'Unassigned'];
+
+  let mappedStatus = stageData[1];
+  const stageId = stageData[0];
+  const odooStageName = stageData[1].toLowerCase();
+  
+  if (stageId === 1 || odooStageName.includes('new') || odooStageName.includes('baru')) {
+    mappedStatus = 'Baru';
+  } else if (stageId === 2 || odooStageName.includes('contact') || odooStageName.includes('hubungi')) {
+    mappedStatus = 'Dihubungi';
+  } else if (stageId === 3 || odooStageName.includes('negotiat') || odooStageName.includes('negosiasi')) {
+    mappedStatus = 'Negotiation';
+  } else if (stageId === 4 || odooStageName.includes('qualif')) {
+    mappedStatus = 'Qualified';
+  } else if (stageId === 6 || odooStageName.includes('won') || odooStageName.includes('berhasil')) {
+    mappedStatus = 'Won';
+  } else if (stageId === 7 || odooStageName.includes('lost') || odooStageName.includes('gagal')) {
+    mappedStatus = 'Lost';
+  }
+
+  // Override status mapping based strictly on active field to ensure Lost leads map correctly
+  if (odoo.active === false) {
+    mappedStatus = 'Lost';
+  }
 
   return {
     id: String(odoo.id),
@@ -55,7 +83,7 @@ function mapOdooToLead(odoo: any): Lead {
     telepon: String(odoo.phone || ''),
     kota: String(odoo.city || ''),
     kategoriBisnis: description.match(/AI Suggested Segment: (.*?)\n/)?.[1] || 'Lainnya',
-    status: stageData[1],
+    status: mappedStatus,
     stageId: stageData[0],
     probability: Number(odoo.probability || 0),
     active: odoo.active !== false,
@@ -95,11 +123,11 @@ export async function moveLeadToStage(leadId: string, stageId: number) {
 }
 
 export async function markWon(leadId: string) {
-  return await setOdooLeadWon(parseInt(leadId, 10));
+  return await updateLeadStatus(leadId, 'Won');
 }
 
 export async function markLost(leadId: string) {
-  return await setOdooLeadLost(parseInt(leadId, 10));
+  return await updateLeadStatus(leadId, 'Lost');
 }
 
 export async function updateLeadStatus(leadId: string, newStatus: LeadStatus): Promise<Lead | null> {
@@ -114,17 +142,141 @@ export async function updateLeadStatus(leadId: string, newStatus: LeadStatus): P
     success = res.success;
   } else {
     const stages = await getStages();
-    const target = stages.find(s => s.name.toLowerCase().includes(newStatus.toLowerCase()));
+    let searchQuery = newStatus.toLowerCase();
+    if (newStatus === 'Baru') searchQuery = 'new';
+    else if (newStatus === 'Dihubungi') searchQuery = 'contact';
+    else if (newStatus === 'Negotiation') searchQuery = 'negotiat';
+    else if (newStatus === 'Qualified') searchQuery = 'qualif';
+
+    const target = stages.find(s => s.name.toLowerCase().includes(searchQuery));
     if (target) {
       const res = await updateOdooLeadStage(idInt, target.id);
       success = res.success;
     }
   }
 
-  if (success) return await getLeadById(leadId);
+  // Sync to Firestore if status updated successfully in Odoo
+  if (success) {
+    try {
+      const leadsRef = collection(db, "leads");
+      const q = query(leadsRef, where("odooLeadId", "==", leadId));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const docId = querySnapshot.docs[0].id;
+        const leadDocRef = doc(db, "leads", docId);
+        await updateDoc(leadDocRef, {
+          status: newStatus,
+          updatedAt: new Date()
+        });
+        console.log(`Firestore lead document ${docId} status updated to ${newStatus}`);
+      } else {
+        console.log(`No Firestore lead document found matching odooLeadId: ${leadId}`);
+      }
+    } catch (fsError) {
+      console.warn("Failed to update Firestore lead status (Firebase might not be configured/online yet):", fsError);
+    }
+  }
+
+  if (success) {
+    const updatedLead = await getLeadById(leadId);
+    if (updatedLead && (newStatus === 'Won' || newStatus === 'Lost')) {
+      try {
+        await addDoc(collection(db, "notifications"), {
+          type: 'keputusan',
+          title: newStatus === 'Won' ? 'Mitra Berhasil Didapatkan! 🏆' : 'Lead Ditandai Gagal ❌',
+          body: `${updatedLead.namaLengkap} (${updatedLead.namaPerusahaan}) telah ditandai sebagai ${newStatus}.`,
+          createdAt: new Date(),
+          read: false,
+          color: newStatus === 'Won' ? 'text-primary bg-primary/10' : 'text-red-500 bg-red-500/10'
+        });
+      } catch (err) {
+        console.warn("Failed to create status notification:", err);
+      }
+    }
+    return updatedLead;
+  }
   return null;
 }
 
 export async function createLead(input: any): Promise<any> {
-  return await createOdooLead(input);
+  const odooRes = await createOdooLead(input);
+  if (odooRes && odooRes.success && odooRes.id) {
+    try {
+      await addDoc(collection(db, "leads"), {
+        namaLengkap: input.namaLengkap || "",
+        namaPerusahaan: input.namaPerusahaan || "",
+        email: input.email || "",
+        telepon: input.telepon || "",
+        kota: input.kota || "",
+        kategoriBisnis: input.kategoriBisnis || "Lainnya",
+        promoMinat: input.promoMinat || "",
+        estimasiVolume: input.estimasiVolume || "",
+        catatan: input.catatan || "",
+        status: "Baru",
+        sumber: input.sumber || "Langsung",
+        sudahSyncOdoo: true,
+        odooLeadId: String(odooRes.id),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      console.log(`Firestore lead document created successfully with odooLeadId: ${odooRes.id}`);
+      
+      // Also create a real-time notification
+      try {
+        await addDoc(collection(db, "notifications"), {
+          type: 'lead_baru',
+          title: 'Lead Baru Masuk!',
+          body: `${input.namaLengkap || "Mitra Baru"} - ${input.namaPerusahaan || "Opportunity"}`,
+          createdAt: new Date(),
+          read: false,
+          color: 'text-blue-500 bg-blue-500/10'
+        });
+      } catch (notifErr) {
+        console.warn("Failed to create notification:", notifErr);
+      }
+    } catch (fsError) {
+      console.warn("Failed to create Firestore lead document (Firebase might not be configured/online yet):", fsError);
+    }
+  }
+  return odooRes;
+}
+
+export async function updateLeadDetails(leadId: string, updates: Partial<Lead>): Promise<Lead | null> {
+  const idInt = parseInt(leadId, 10);
+  
+  // 1. Sync to Odoo CRM
+  const odooRes = await updateOdooLeadDetails(idInt, updates);
+  if (!odooRes.success) {
+    console.error("Failed to update lead details in Odoo:", odooRes.error);
+  }
+
+  // 2. Sync to Firestore
+  try {
+    const leadsRef = collection(db, "leads");
+    const q = query(leadsRef, where("odooLeadId", "==", leadId));
+    const querySnapshot = await getDocs(q);
+    
+    const fsUpdates: any = {
+      updatedAt: new Date()
+    };
+    if (updates.namaLengkap !== undefined) fsUpdates.namaLengkap = updates.namaLengkap;
+    if (updates.namaPerusahaan !== undefined) fsUpdates.namaPerusahaan = updates.namaPerusahaan;
+    if (updates.email !== undefined) fsUpdates.email = updates.email;
+    if (updates.telepon !== undefined) fsUpdates.telepon = updates.telepon;
+    if (updates.kota !== undefined) fsUpdates.kota = updates.kota;
+    if (updates.catatan !== undefined) fsUpdates.catatan = updates.catatan;
+    if (updates.catatanInternal !== undefined) fsUpdates.catatanInternal = updates.catatanInternal;
+
+    if (!querySnapshot.empty) {
+      const docId = querySnapshot.docs[0].id;
+      const leadDocRef = doc(db, "leads", docId);
+      await updateDoc(leadDocRef, fsUpdates);
+      console.log(`Firestore lead document ${docId} details updated successfully.`);
+    }
+  } catch (fsError) {
+    console.warn("Failed to update Firestore lead details:", fsError);
+  }
+
+  return await getLeadById(leadId);
 }

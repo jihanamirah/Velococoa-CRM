@@ -9,6 +9,18 @@ import { execute } from '@/lib/odoo';
 function extractValue(xml: string): any {
   if (xml.includes('<nil/>')) return null;
   
+  // 1. Check for array first to prevent array strings matching string check
+  const arrayMatch = xml.match(/<array>[\s\S]*?<data>([\s\S]*?)<\/data>[\s\S]*?<\/array>/);
+  if (arrayMatch) {
+    const valuePart = arrayMatch[1];
+    const matches = valuePart.match(/<value>(?:(?!<value>)[\s\S])*?<\/value>/g) || [];
+    return matches.map(v => {
+      const inner = v.replace(/^<value>([\s\S]*)<\/value>$/, '$1');
+      return extractValue(inner);
+    });
+  }
+
+  // 2. Simple types
   const sMatch = xml.match(/<string>([\s\S]*?)<\/string>/);
   if (sMatch) return sMatch[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
   
@@ -21,13 +33,20 @@ function extractValue(xml: string): any {
   const dMatch = xml.match(/<double>([\d.]+)<\/double>/);
   if (dMatch) return parseFloat(dMatch[1]);
 
-  const arrayMatch = xml.match(/<array>[\s\S]*?<data>([\s\S]*?)<\/data>[\s\S]*?<\/array>/);
-  if (arrayMatch) {
-    const values = arrayMatch[1].match(/<value>[\s\S]*?<\/value>/g) || [];
-    return values.map(v => extractValue(v));
-  }
-
   return null;
+}
+
+function getMemberValueXml(memberXml: string): string {
+  const nameEndTag = '</name>';
+  const memberEndTag = '</member>';
+  const startIdx = memberXml.indexOf(nameEndTag);
+  const endIdx = memberXml.lastIndexOf(memberEndTag);
+  if (startIdx === -1 || endIdx === -1) return '';
+  
+  const content = memberXml.substring(startIdx + nameEndTag.length, endIdx).trim();
+  // Strip outer <value> and </value> if present
+  const match = content.match(/^<value>([\s\S]*)<\/value>$/);
+  return match ? match[1].trim() : content;
 }
 
 function parseOdooRecords(xml: string): any[] {
@@ -39,9 +58,9 @@ function parseOdooRecords(xml: string): any[] {
     const memberMatches = struct.match(/<member>[\s\S]*?<\/member>/g) || [];
     for (const member of memberMatches) {
       const name = member.match(/<name>(.*?)<\/name>/)?.[1];
-      const valuePart = member.match(/<value>([\s\S]*?)<\/value>/)?.[1];
-      if (name && valuePart !== undefined) {
-        obj[name] = extractValue(valuePart);
+      if (name) {
+        const valXml = getMemberValueXml(member);
+        obj[name] = extractValue(valXml);
       }
     }
     records.push(obj);
@@ -64,7 +83,7 @@ export async function getOdooStages() {
 
 export async function getOdooLeads() {
   try {
-    const rawXml = await execute('crm.lead', 'search_read', [[]], {
+    const rawXml = await execute('crm.lead', 'search_read', [[['active', 'in', [true, false]]]], {
       fields: [
         'id', 'name', 'contact_name', 'email_from', 'phone', 
         'city', 'description', 'stage_id', 'probability', 
@@ -117,7 +136,7 @@ export async function createOdooLead(data: any) {
 
 export async function updateOdooLeadStage(leadId: number, stageId: number) {
   try {
-    await execute('crm.lead', 'write', [[leadId], { stage_id: stageId }]);
+    await execute('crm.lead', 'write', [[leadId], { stage_id: stageId, active: true }]);
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -127,6 +146,7 @@ export async function updateOdooLeadStage(leadId: number, stageId: number) {
 export async function setOdooLeadWon(leadId: number) {
   try {
     await execute('crm.lead', 'action_set_won', [[leadId]]);
+    await execute('crm.lead', 'write', [[leadId], { stage_id: 6 }]);
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -136,6 +156,7 @@ export async function setOdooLeadWon(leadId: number) {
 export async function setOdooLeadLost(leadId: number) {
   try {
     await execute('crm.lead', 'action_set_lost', [[leadId]]);
+    await execute('crm.lead', 'write', [[leadId], { stage_id: 7 }]);
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -144,5 +165,26 @@ export async function setOdooLeadLost(leadId: number) {
 
 export async function syncLeadToOdoo(lead: any) {
   if (lead.odooLeadId) return { success: true, odooId: lead.odooLeadId };
-  return await createOdooLead(lead);
+  const res = await createOdooLead(lead);
+  if (res.success && res.id) {
+    return { success: true, odooId: res.id };
+  }
+  return { success: false, error: res.error || "Gagal sinkronisasi" };
+}
+
+export async function updateOdooLeadDetails(leadId: number, data: any) {
+  try {
+    const odooFields: any = {};
+    if (data.namaPerusahaan) odooFields.name = data.namaPerusahaan;
+    if (data.namaLengkap) odooFields.contact_name = data.namaLengkap;
+    if (data.email !== undefined) odooFields.email_from = data.email;
+    if (data.telepon !== undefined) odooFields.phone = data.telepon;
+    if (data.kota !== undefined) odooFields.city = data.kota;
+    if (data.catatan !== undefined) odooFields.description = data.catatan;
+
+    await execute('crm.lead', 'write', [[leadId], odooFields]);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
 }

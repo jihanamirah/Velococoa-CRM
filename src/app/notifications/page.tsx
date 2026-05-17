@@ -10,27 +10,107 @@ import {
   AlertCircle, 
   UserPlus, 
   Trash2,
-  MoreVertical
+  MoreVertical,
+  Check
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
-const initialNotifications = [
-  { id: '1', type: 'lead_baru', title: 'Lead Baru Masuk!', body: 'Kopi Kenangan Senja - Kafe & Kedai Kopi', date: '2 jam lalu', read: false, color: 'text-blue-500 bg-blue-500/10' },
-  { id: '2', type: 'follow_up', title: 'Follow Up Diperlukan!', body: 'Sweet Bakery belum dihubungi lebih dari 24 jam', date: 'Kemarin', read: false, color: 'text-amber-500 bg-amber-500/10' },
-  { id: '3', type: 'keputusan', title: 'Keputusan Diperlukan!', body: 'Grand Aston Hotel menunggu keputusan Won atau Lost', date: '2 hari lalu', read: true, color: 'text-red-500 bg-red-500/10' },
-  { id: '4', type: 'lead_baru', title: 'Lead Baru Masuk!', body: 'IndoFood Corp - Hotel & Korporasi', date: '3 hari lalu', read: true, color: 'text-blue-500 bg-blue-500/10' },
-];
+interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  createdAt: any;
+  read: boolean;
+  color: string;
+}
 
 export default function NotificationsPage() {
-  const [notifs, setNotifs] = useState(initialNotifications);
+  const [notifs, setNotifs] = useState<NotificationItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const markAllRead = () => {
-    setNotifs(notifs.map(n => ({ ...n, read: true })));
+  useEffect(() => {
+    // Listen to notifications in real-time
+    const q = query(collection(db, "notifications"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: NotificationItem[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        list.push({
+          id: doc.id,
+          type: data.type || 'lead_baru',
+          title: data.title || 'Notifikasi',
+          body: data.body || '',
+          createdAt: data.createdAt,
+          read: !!data.read,
+          color: data.color || 'text-blue-500 bg-blue-500/10'
+        });
+      });
+      setNotifs(list);
+      setIsLoading(false);
+    }, (err) => {
+      console.warn("Failed to listen to notifications page:", err);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const markAllRead = async () => {
+    try {
+      const q = query(collection(db, "notifications"));
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      snapshot.forEach((d) => {
+        if (!d.data().read) {
+          batch.update(doc(db, "notifications", d.id), { read: true });
+        }
+      });
+      await batch.commit();
+    } catch (err) {
+      console.warn("Failed to mark all as read:", err);
+    }
   };
 
-  const deleteNotif = (id: string) => {
-    setNotifs(notifs.filter(n => n.id !== id));
+  const markSingleRead = async (id: string) => {
+    try {
+      await updateDoc(doc(db, "notifications", id), { read: true });
+    } catch (err) {
+      console.warn("Failed to mark single notification as read:", err);
+    }
+  };
+
+  const deleteNotif = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "notifications", id));
+    } catch (err) {
+      console.warn("Failed to delete notification:", err);
+    }
+  };
+
+  const formatNotifDate = (createdAt: any): string => {
+    if (!createdAt) return 'Baru Saja';
+    let date: Date;
+    if (createdAt.seconds) {
+      date = new Date(createdAt.seconds * 1000);
+    } else if (createdAt instanceof Date) {
+      date = createdAt;
+    } else {
+      date = new Date(createdAt);
+    }
+    
+    const diffMs = Date.now() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    
+    if (diffMins < 1) return 'Baru Saja';
+    if (diffMins < 60) return `${diffMins} menit lalu`;
+    if (diffHours < 24) return `${diffHours} jam lalu`;
+    if (diffHours < 48) return 'Kemarin';
+    return date.toLocaleDateString('id-ID');
   };
 
   return (
@@ -41,17 +121,19 @@ export default function NotificationsPage() {
             <h1 className="text-3xl font-bold tracking-tight">Notifikasi</h1>
             <p className="text-muted-foreground">Pantau aktivitas lead secara realtime.</p>
           </div>
-          <Button variant="outline" size="sm" onClick={markAllRead} className="bg-card/30 border-border/50">
-            Tandai Semua Dibaca
-          </Button>
+          {notifs.some(n => !n.read) && (
+            <Button variant="outline" size="sm" onClick={markAllRead} className="bg-card/30 border-border/50 hover:bg-card/50">
+              Tandai Semua Dibaca
+            </Button>
+          )}
         </div>
 
         <div className="space-y-3">
           {notifs.map((n) => (
             <Card key={n.id} className={cn(
-              "border-none shadow-md bg-card/40 transition-all group overflow-hidden",
-              !n.read && "ring-1 ring-primary/20"
-            )}>
+              "border-none shadow-md bg-card/40 transition-all group overflow-hidden hover:bg-card/60 cursor-pointer",
+              !n.read && "ring-1 ring-primary/20 bg-card/60"
+            )} onClick={() => !n.read && markSingleRead(n.id)}>
               <CardContent className="p-0">
                 <div className="flex items-center p-4 gap-4">
                   <div className={cn("p-3 rounded-xl flex-shrink-0", n.color)}>
@@ -65,16 +147,18 @@ export default function NotificationsPage() {
                         {n.title}
                         {!n.read && <div className="h-2 w-2 rounded-full bg-primary animate-pulse"></div>}
                       </div>
-                      <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">{n.date}</span>
+                      <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">{formatNotifDate(n.createdAt)}</span>
                     </div>
                     <p className="text-sm text-muted-foreground line-clamp-1">{n.body}</p>
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                    {!n.read && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => markSingleRead(n.id)}>
+                        <Check className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteNotif(n.id)}>
                       <Trash2 className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                      <MoreVertical className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -82,13 +166,18 @@ export default function NotificationsPage() {
               </CardContent>
             </Card>
           ))}
-          {notifs.length === 0 && (
-             <div className="text-center py-20 text-muted-foreground space-y-4">
-               <div className="p-4 rounded-full bg-muted/20 w-fit mx-auto">
-                 <Bell className="h-12 w-12 opacity-20" />
-               </div>
-               <p>Kotak masuk Anda bersih.</p>
-            </div>
+          {isLoading && (
+             <div className="text-center py-20 text-muted-foreground">
+               Loading notifikasi...
+             </div>
+          )}
+          {!isLoading && notifs.length === 0 && (
+              <div className="text-center py-20 text-muted-foreground space-y-4">
+                <div className="p-4 rounded-full bg-muted/20 w-fit mx-auto">
+                  <Bell className="h-12 w-12 opacity-20" />
+                </div>
+                <p>Kotak masuk Anda bersih.</p>
+              </div>
           )}
         </div>
       </div>

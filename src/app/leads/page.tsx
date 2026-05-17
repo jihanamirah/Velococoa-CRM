@@ -34,7 +34,7 @@ export default function LeadsPage() {
     return matchesFilter && matchesSearch;
   });
 
-  const statuses = ['Semua', 'Baru', 'Dihubungi', 'Qualified', 'Won', 'Lost'];
+  const statuses = ['Semua', 'Baru', 'Dihubungi', 'Negotiation', 'Qualified', 'Won', 'Lost'];
 
   return (
     <CRMLayout>
@@ -115,6 +115,7 @@ export default function LeadsPage() {
                           "text-[10px] px-3 py-1 uppercase tracking-widest font-bold border-none",
                           lead.status === 'Baru' && 'bg-blue-500/10 text-blue-500',
                           lead.status === 'Dihubungi' && 'bg-amber-500/10 text-amber-500',
+                          lead.status === 'Negotiation' && 'bg-purple-500/10 text-purple-500',
                           lead.status === 'Qualified' && 'bg-green-500/10 text-green-500',
                           lead.status === 'Won' && 'bg-primary/20 text-primary',
                           lead.status === 'Lost' && 'bg-red-500/10 text-red-500',

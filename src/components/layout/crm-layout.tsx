@@ -29,6 +29,9 @@ import {
   SidebarProvider,
   SidebarTrigger 
 } from "@/components/ui/sidebar";
+import { collection, query, onSnapshot, addDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useState, useEffect } from 'react';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
@@ -39,13 +42,41 @@ const navItems = [
 
 export function CRMLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const q = query(collection(db, "notifications"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      let unread = 0;
+      if (snapshot.empty) {
+        const initial = [
+          { type: 'lead_baru', title: 'Lead Baru Masuk!', body: 'Kopi Kenangan Senja - Kafe & Kedai Kopi', createdAt: new Date(Date.now() - 7200000), read: false, color: 'text-blue-500 bg-blue-500/10' },
+          { type: 'follow_up', title: 'Follow Up Diperlukan!', body: 'Sweet Bakery belum dihubungi lebih dari 24 jam', createdAt: new Date(Date.now() - 86400000), read: false, color: 'text-amber-500 bg-amber-500/10' },
+          { type: 'keputusan', title: 'Keputusan Diperlukan!', body: 'Grand Aston Hotel menunggu keputusan Won atau Lost', createdAt: new Date(Date.now() - 172800000), read: true, color: 'text-red-500 bg-red-500/10' },
+        ];
+        initial.forEach(n => addDoc(collection(db, "notifications"), n).catch(() => {}));
+        unread = 2;
+      } else {
+        snapshot.forEach((doc) => {
+          if (!doc.data().read) {
+            unread++;
+          }
+        });
+      }
+      setUnreadCount(unread);
+    }, (err) => {
+      console.warn("Failed to listen to notifications in layout:", err);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
     <SidebarProvider>
       <div className="flex min-h-screen bg-background w-full">
         <Sidebar className="border-r border-border/50 shadow-xl" collapsible="icon">
           <SidebarHeader className="p-4 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl">V</div>
+            <img src="/logo.png" alt="VeloCocoa Logo" className="w-8 h-8 rounded-lg object-cover" />
             <span className="font-bold text-xl tracking-tight group-data-[collapsible=icon]:hidden">
               VeloCocoa
             </span>
@@ -103,14 +134,17 @@ export function CRMLayout({ children }: { children: React.ReactNode }) {
               <Link href="/notifications">
                 <Button variant="ghost" size="icon" className="relative">
                   <Bell className="h-5 w-5" />
-                  <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center bg-accent text-white border-none text-[10px]">3</Badge>
+                  {unreadCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center bg-accent text-white border-none text-[10px] animate-pulse">
+                      {unreadCount}
+                    </Badge>
+                  )}
                 </Button>
               </Link>
               <div className="h-8 w-px bg-border/50 mx-2 hidden md:block"></div>
               <div className="flex items-center gap-3">
                 <div className="text-right hidden md:block">
                   <div className="text-sm font-semibold">Jihan Amirah</div>
-                  <div className="text-xs text-muted-foreground">Sales Executive</div>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary border-2 border-primary/20">
                   JA

@@ -27,8 +27,8 @@ export default function LoginPage() {
       <Card className="w-full max-w-md border-none shadow-2xl bg-white dark:bg-[#2A1D16] overflow-hidden">
         <div className="h-2 bg-primary w-full"></div>
         <CardHeader className="space-y-4 text-center pt-8">
-          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-2">
-             <div className="text-2xl font-bold text-primary">V</div>
+          <div className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-2 overflow-hidden">
+             <img src="/logo.png" alt="VeloCocoa Logo" className="w-full h-full object-cover" />
           </div>
           <CardTitle className="text-3xl font-bold tracking-tight text-[#3B1A08] dark:text-white">
             VeloCocoa <span className="text-primary italic font-light">CRM</span>
