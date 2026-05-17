@@ -1,4 +1,5 @@
 import { aiLeadSegmentationAndPrioritization } from '@/ai/flows/ai-lead-segmentation-and-prioritization-flow';
+import { getOdooLeads, createOdooLead, updateOdooLeadStage } from '@/services/odoo';
 
 export type LeadStatus = 'Baru' | 'Dihubungi' | 'Qualified' | 'Won' | 'Lost';
 export type LeadSource = 'Email Marketing' | 'Website' | 'Langsung';
@@ -26,106 +27,70 @@ export interface Lead {
   updatedAt: string;
 }
 
-// Simulated persistence using local storage or memory for prototype
-let leads: Lead[] = [
-  {
-    id: '1',
-    namaLengkap: 'Budi Santoso',
-    namaPerusahaan: 'Kopi Kenangan Senja',
-    email: 'budi@kopisenja.com',
-    telepon: '08123456789',
-    kota: 'Jakarta',
-    kategoriBisnis: 'Kafe & Kedai Kopi',
-    promoMinat: 'Diskon Biji Coklat 20%',
-    estimasiVolume: '50kg / month',
-    catatan: 'Tertarik untuk supply tetap.',
+// Mapper to convert Odoo lead to our App Lead type
+function mapOdooToLead(odoo: any): Lead {
+  let status: LeadStatus = 'Baru';
+  if (odoo.stage_id) {
+    // Basic mapping based on stage names (case insensitive)
+    const stage = String(odoo.stage_id).toLowerCase();
+    if (stage.includes('new')) status = 'Baru';
+    else if (stage.includes('qualified')) status = 'Qualified';
+    else if (stage.includes('won')) status = 'Won';
+    else if (stage.includes('lost')) status = 'Lost';
+    else status = 'Dihubungi';
+  }
+
+  return {
+    id: String(odoo.id),
+    namaLengkap: odoo.contact_name || 'No Name',
+    namaPerusahaan: odoo.name || 'Untitled Opportunity',
+    email: odoo.email_from || '',
+    telepon: odoo.phone || '',
+    kota: odoo.city || '',
+    kategoriBisnis: 'Hotel & Korporasi', // Default or parsed from desc
+    promoMinat: '',
+    estimasiVolume: '',
+    catatan: odoo.description || '',
     catatanInternal: '',
-    status: 'Baru',
-    sumber: 'Website',
-    sudahSyncOdoo: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-  },
-  {
-    id: '2',
-    namaLengkap: 'Ani Wijaya',
-    namaPerusahaan: 'Sweet Bakery',
-    email: 'ani@sweetbakery.id',
-    telepon: '082233445566',
-    kota: 'Bandung',
-    kategoriBisnis: 'Bakery & Pastry',
-    promoMinat: 'Free Sample Pack',
-    estimasiVolume: '20kg / week',
-    catatan: 'Mencoba coklat coating baru.',
-    catatanInternal: 'Customer lama, ingin ganti supplier.',
-    status: 'Dihubungi',
-    sumber: 'Email Marketing',
-    sudahSyncOdoo: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 25).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-  },
-  {
-    id: '3',
-    namaLengkap: 'James Bond',
-    namaPerusahaan: 'Grand Aston Hotel',
-    email: 'procurement@grandaston.com',
-    telepon: '0811223344',
-    kota: 'Bali',
-    kategoriBisnis: 'Hotel & Korporasi',
-    promoMinat: 'Corporate Rates',
-    estimasiVolume: '200kg / month',
-    catatan: 'Butuh coklat premium untuk dessert buffet.',
-    catatanInternal: '',
-    status: 'Qualified',
+    status: status,
     sumber: 'Langsung',
     sudahSyncOdoo: true,
-    odooLeadId: 'CRM-9921',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-  }
-];
+    odooLeadId: String(odoo.id),
+    createdAt: odoo.create_date || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 export async function getLeads(): Promise<Lead[]> {
-  return leads;
+  const odooLeads = await getOdooLeads();
+  return odooLeads.map(mapOdooToLead);
 }
 
 export async function getLeadById(id: string): Promise<Lead | undefined> {
-  return leads.find(l => l.id === id);
+  const all = await getLeads();
+  return all.find(l => l.id === id);
 }
 
 export async function createLead(input: Partial<Lead>): Promise<Lead> {
-  const newLead: Lead = {
-    id: Math.random().toString(36).substr(2, 9),
-    namaLengkap: input.namaLengkap || '',
-    namaPerusahaan: input.namaPerusahaan || '',
-    email: input.email || '',
-    telepon: input.telepon || '',
-    kota: input.kota || '',
-    kategoriBisnis: input.kategoriBisnis || 'Lainnya',
-    promoMinat: input.promoMinat || '',
-    estimasiVolume: input.estimasiVolume || '',
-    catatan: input.catatan || '',
-    catatanInternal: '',
+  const newLead: Partial<Lead> = {
+    ...input,
     status: 'Baru',
-    sumber: input.sumber || 'Langsung',
-    sudahSyncOdoo: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    ...input
   };
 
   // Run AI analysis
   try {
     const aiResult = await aiLeadSegmentationAndPrioritization({
-      namaLengkap: newLead.namaLengkap,
-      namaPerusahaan: newLead.namaPerusahaan,
-      email: newLead.email,
-      telepon: newLead.telepon,
-      kota: newLead.kota,
-      kategoriBisnis: newLead.kategoriBisnis,
-      promoMinat: newLead.promoMinat,
-      estimasiVolume: newLead.estimasiVolume,
-      catatan: newLead.catatan,
+      namaLengkap: input.namaLengkap || '',
+      namaPerusahaan: input.namaPerusahaan || '',
+      email: input.email || '',
+      telepon: input.telepon || '',
+      kota: input.kota || '',
+      kategoriBisnis: input.kategoriBisnis || '',
+      promoMinat: input.promoMinat || '',
+      estimasiVolume: input.estimasiVolume || '',
+      catatan: input.catatan || '',
     });
     
     newLead.aiSuggestedSegment = aiResult.suggestedBusinessSegment;
@@ -135,18 +100,21 @@ export async function createLead(input: Partial<Lead>): Promise<Lead> {
     console.error('AI Analysis failed:', err);
   }
 
-  leads = [newLead, ...leads];
-  return newLead;
+  // Create in Odoo
+  const odooRes = await createOdooLead(newLead);
+  if (odooRes.success) {
+    newLead.id = odooRes.id;
+    newLead.odooLeadId = odooRes.id;
+    newLead.sudahSyncOdoo = true;
+  }
+
+  return newLead as Lead;
 }
 
 export async function updateLeadStatus(id: string, status: LeadStatus): Promise<Lead | undefined> {
-  const leadIndex = leads.findIndex(l => l.id === id);
-  if (leadIndex === -1) return undefined;
-
-  leads[leadIndex] = {
-    ...leads[leadIndex],
-    status,
-    updatedAt: new Date().toISOString()
-  };
-  return leads[leadIndex];
+  const result = await updateOdooLeadStage(parseInt(id, 10), status);
+  if (result.success) {
+    return getLeadById(id);
+  }
+  return undefined;
 }

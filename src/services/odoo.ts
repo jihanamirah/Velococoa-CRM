@@ -1,57 +1,88 @@
 'use server';
 
 /**
- * @fileOverview Odoo 18 CRM Integration Service.
- * Handles authentication and lead synchronization with the Odoo ERP system.
+ * @fileOverview Odoo 18 CRM Integration Service (Server Actions).
+ * Handles the mapping between the app's Lead type and Odoo's crm.lead model.
  */
 
-const ODOO_URL = process.env.ODOO_URL || 'https://www.ptrfserp.com/';
-const DB = process.env.ODOO_DB || 'ASPK60';
-const USERNAME = process.env.ODOO_USERNAME || 'jihanamirahk1@gmail.com';
-const PASSWORD = process.env.ODOO_PASSWORD || 'aspk60';
+import { authenticate, execute } from '@/lib/odoo';
+
+const DB = 'ASPK60';
+const PASSWORD = 'aspk60';
 
 /**
- * Authenticates with the Odoo instance.
- * In a production environment, this would perform a real XML-RPC call.
+ * Helper to parse Odoo XML response for basic lists of objects.
+ * Note: A full XML parser would be better, but we use regex for zero-dependency simplicity in this prototype.
  */
-async function authenticate() {
+function parseOdooRecords(xml: string): any[] {
+  const records: any[] = [];
+  const structMatches = xml.match(/<struct>[\s\S]*?<\/struct>/g) || [];
+
+  for (const struct of structMatches) {
+    const obj: any = {};
+    const memberMatches = struct.match(/<member>[\s\S]*?<\/member>/g) || [];
+    for (const member of memberMatches) {
+      const name = member.match(/<name>(.*?)<\/name>/)?.[1];
+      let value: any = null;
+      if (member.includes('<string>')) value = member.match(/<string>(.*?)<\/string>/)?.[1];
+      else if (member.includes('<int>')) value = parseInt(member.match(/<int>(\d+)<\/int>/)?.[1] || '0', 10);
+      else if (member.includes('<boolean>')) value = member.match(/<boolean>(\d+)<\/boolean>/)?.[1] === '1';
+      
+      if (name) obj[name] = value;
+    }
+    records.push(obj);
+  }
+  return records;
+}
+
+export async function getOdooLeads() {
   try {
-    // Simulation of Odoo authentication
-    // Real Odoo uses xmlrpc.client.common.authenticate(db, username, password, {})
-    console.log(`Authenticating with Odoo at ${ODOO_URL}...`);
-    return 1; // Returns simulated UID
+    const rawXml = await execute('crm.lead', 'search_read', [[]], {
+      fields: ['id', 'name', 'contact_name', 'email_from', 'phone', 'city', 'description', 'stage_id', 'type', 'priority', 'create_date'],
+      limit: 50
+    });
+    return parseOdooRecords(rawXml);
   } catch (error) {
-    console.error('Odoo Auth Error:', error);
-    return null;
+    console.error('getOdooLeads error:', error);
+    return [];
   }
 }
 
-/**
- * Synchronizes a CRM lead to Odoo's 'crm.lead' model.
- * This is implemented as a Server Action.
- */
-export async function syncLeadToOdoo(lead: any) {
+export async function createOdooLead(data: any) {
   try {
-    const uid = await authenticate();
-    if (!uid) {
-      throw new Error('Authentication failed');
-    }
-
-    console.log(`Syncing lead [${lead.namaPerusahaan}] to Odoo...`);
+    const resultXml = await execute('crm.lead', 'create', [{
+      name: data.namaPerusahaan || 'New Lead',
+      contact_name: data.namaLengkap,
+      email_from: data.email,
+      phone: data.telepon,
+      city: data.kota,
+      description: `AI Suggested Segment: ${data.aiSuggestedSegment || 'N/A'}\nReasoning: ${data.aiReasoning || 'N/A'}\nNotes: ${data.catatan || ''}`,
+      type: 'opportunity',
+      priority: data.aiFollowUpPriority === 'High' ? '3' : '1'
+    }]);
     
-    // Logic to create CRM Opportunity in Odoo 18
-    // Service: 'object', Method: 'execute_kw', Model: 'crm.lead', Action: 'create'
-    
-    // Simulate network latency
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    return { 
-      success: true, 
-      odooId: `ODOO-${Math.floor(Math.random() * 10000)}`,
-      timestamp: new Date().toISOString()
-    };
+    const match = resultXml.match(/<int>(\d+)<\/int>/);
+    return match ? { success: true, id: match[1] } : { success: false };
   } catch (error: any) {
-    console.error('Odoo Sync Error:', error.message);
     return { success: false, error: error.message };
   }
+}
+
+export async function updateOdooLeadStage(id: number, stageName: string) {
+  try {
+    // In Odoo 18, we typically set probability or use stage_id
+    // For simplicity, we'll mark as won/lost using standard methods if applicable
+    if (stageName === 'Won') {
+      await execute('crm.lead', 'action_set_won', [[id]]);
+    } else if (stageName === 'Lost') {
+      await execute('crm.lead', 'action_set_lost', [[id]]);
+    }
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function syncLeadToOdoo(lead: any) {
+  return createOdooLead(lead);
 }
