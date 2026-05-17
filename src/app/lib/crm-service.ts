@@ -1,8 +1,19 @@
-import { aiLeadSegmentationAndPrioritization } from '@/ai/flows/ai-lead-segmentation-and-prioritization-flow';
-import { getOdooLeads, createOdooLead, updateOdooLeadStage } from '@/services/odoo';
 
-export type LeadStatus = 'Baru' | 'Dihubungi' | 'Qualified' | 'Won' | 'Lost';
-export type LeadSource = 'Email Marketing' | 'Website' | 'Langsung';
+import { aiLeadSegmentationAndPrioritization } from '@/ai/flows/ai-lead-segmentation-and-prioritization-flow';
+import { 
+  getOdooLeads, 
+  getOdooStages, 
+  createOdooLead, 
+  updateOdooLeadStage, 
+  setOdooLeadWon, 
+  setOdooLeadLost 
+} from '@/services/odoo';
+
+export interface OdooStage {
+  id: number;
+  name: string;
+  sequence: number;
+}
 
 export interface Lead {
   id: string;
@@ -12,39 +23,23 @@ export interface Lead {
   telepon: string;
   kota: string;
   kategoriBisnis: string;
-  promoMinat: string;
-  estimasiVolume: string;
-  catatan: string;
-  catatanInternal: string;
-  status: LeadStatus;
-  sumber: LeadSource;
+  status: string; // Map to stage name
+  stageId: number;
+  probability: number;
+  active: boolean;
   sudahSyncOdoo: boolean;
-  odooLeadId?: string;
-  aiSuggestedSegment?: string;
-  aiFollowUpPriority?: string;
-  aiReasoning?: string;
+  odooLeadId: string;
+  aiFollowUpPriority: string;
+  aiReasoning: string;
   createdAt: string;
-  updatedAt: string;
 }
 
 /**
  * Mapping data Odoo crm.lead ke interface Lead lokal aplikasi.
  */
 function mapOdooToLead(odoo: any): Lead {
-  let status: LeadStatus = 'Baru';
-  
-  if (odoo.stage_id) {
-    const stage = String(odoo.stage_id).toLowerCase();
-    if (stage.includes('new') || stage.includes('baru')) status = 'Baru';
-    else if (stage.includes('qualified')) status = 'Qualified';
-    else if (stage.includes('won') || stage.includes('berhasil')) status = 'Won';
-    else if (stage.includes('lost') || stage.includes('gagal')) status = 'Lost';
-    else if (stage.includes('prop') || stage.includes('hubungi') || stage.includes('contact')) status = 'Dihubungi';
-  }
-
-  // Odoo XML-RPC returns boolean false for empty strings.
-  // We must ensure description is a string before using .match()
   const description = typeof odoo.description === 'string' ? odoo.description : '';
+  const stageData = Array.isArray(odoo.stage_id) ? odoo.stage_id : [0, 'Unknown'];
 
   return {
     id: String(odoo.id),
@@ -54,18 +49,15 @@ function mapOdooToLead(odoo: any): Lead {
     telepon: (typeof odoo.phone === 'string' ? odoo.phone : '') || '',
     kota: (typeof odoo.city === 'string' ? odoo.city : '') || '',
     kategoriBisnis: description.match(/AI Suggested Segment: (.*?)\n/)?.[1] || 'Lainnya',
-    promoMinat: '',
-    estimasiVolume: '',
-    catatan: description,
-    catatanInternal: '',
-    status: status,
-    sumber: 'Langsung',
+    status: stageData[1],
+    stageId: stageData[0],
+    probability: typeof odoo.probability === 'number' ? odoo.probability : 0,
+    active: odoo.active !== false,
     sudahSyncOdoo: true,
     odooLeadId: String(odoo.id),
     aiFollowUpPriority: odoo.priority === '3' ? 'High' : odoo.priority === '2' ? 'Medium' : 'Low',
     aiReasoning: description.match(/Reasoning: (.*?)\n/)?.[1] || '',
     createdAt: (typeof odoo.create_date === 'string' ? odoo.create_date : '') || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -74,53 +66,39 @@ export async function getLeads(): Promise<Lead[]> {
   return odooLeads.map(mapOdooToLead);
 }
 
-export async function getLeadById(id: string): Promise<Lead | undefined> {
-  const all = await getLeads();
-  return all.find(l => l.id === id);
+export async function getStages(): Promise<OdooStage[]> {
+  const stages = await getOdooStages();
+  return stages.map(s => ({
+    id: s.id,
+    name: s.name,
+    sequence: s.sequence
+  }));
 }
 
-export async function createLead(input: Partial<Lead>): Promise<Lead> {
-  const newLead: Partial<Lead> = {
-    ...input,
-    status: 'Baru',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+export async function moveLeadToStage(leadId: string, stageId: number) {
+  return await updateOdooLeadStage(parseInt(leadId, 10), stageId);
+}
 
+export async function markWon(leadId: string) {
+  return await setOdooLeadWon(parseInt(leadId, 10));
+}
+
+export async function markLost(leadId: string) {
+  return await setOdooLeadLost(parseInt(leadId, 10));
+}
+
+export async function createLead(input: any): Promise<any> {
+  let aiResult = { suggestedBusinessSegment: 'Lainnya', followUpPriority: 'Low', reasoning: '' };
   try {
-    const aiResult = await aiLeadSegmentationAndPrioritization({
-      namaLengkap: input.namaLengkap || '',
-      namaPerusahaan: input.namaPerusahaan || '',
-      email: input.email || '',
-      telepon: input.telepon || '',
-      kota: input.kota || '',
-      kategoriBisnis: input.kategoriBisnis || '',
-      promoMinat: input.promoMinat || '',
-      estimasiVolume: input.estimasiVolume || '',
-      catatan: input.catatan || '',
-    });
-    
-    newLead.aiSuggestedSegment = aiResult.suggestedBusinessSegment;
-    newLead.aiFollowUpPriority = aiResult.followUpPriority;
-    newLead.aiReasoning = aiResult.reasoning;
+    aiResult = await aiLeadSegmentationAndPrioritization(input);
   } catch (err) {
     console.error('AI Analysis failed:', err);
   }
 
-  const odooRes = await createOdooLead(newLead);
-  if (odooRes.success) {
-    newLead.id = odooRes.id;
-    newLead.odooLeadId = odooRes.id;
-    newLead.sudahSyncOdoo = true;
-  }
-
-  return newLead as Lead;
-}
-
-export async function updateLeadStatus(id: string, status: LeadStatus): Promise<Lead | undefined> {
-  const result = await updateOdooLeadStage(parseInt(id, 10), status);
-  if (result.success) {
-    return getLeadById(id);
-  }
-  return undefined;
+  return await createOdooLead({
+    ...input,
+    aiSuggestedSegment: aiResult.suggestedBusinessSegment,
+    aiFollowUpPriority: aiResult.followUpPriority,
+    aiReasoning: aiResult.reasoning
+  });
 }
