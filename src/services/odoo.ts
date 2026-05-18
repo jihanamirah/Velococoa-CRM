@@ -491,10 +491,16 @@ export async function payOdooInvoice(invoiceId: number, amount: number, paymentD
       active_ids: [invoiceId]
     };
 
+    // Get the default values from context to fetch linked receivable line_ids
+    const defaultFields = ['line_ids'];
+    const defaultVals = await execute('account.payment.register', 'default_get', [defaultFields], { context });
+    const lineIds = defaultVals?.line_ids || [];
+
     const wizardId = await execute('account.payment.register', 'create', [{
       payment_date: paymentDate,
       journal_id: journalId,
-      amount: amount
+      amount: amount,
+      line_ids: lineIds
     }], { context });
 
     // 3. Confirm payment to reconcile invoice
