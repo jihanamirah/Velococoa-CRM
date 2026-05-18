@@ -19,7 +19,9 @@ import {
   LayoutGrid,
   Send,
   Target,
-  MailOpen
+  MailOpen,
+  Receipt,
+  BookOpen
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -76,6 +78,8 @@ export function CRMLayout({ children }: { children: React.ReactNode }) {
   } else if (isAccounting) {
     activeNavItems = [
       { icon: Wallet, label: 'Accounting Dashboard', href: '/accounting' },
+      { icon: Receipt, label: 'Faktur Penjualan (Invoices)', href: '/accounting/invoices' },
+      { icon: BookOpen, label: 'Journal Entries (Jurnal)', href: '/accounting/journals' },
       { icon: LayoutGrid, label: 'Ganti Portal ERP', href: '/login' },
     ];
   } else {

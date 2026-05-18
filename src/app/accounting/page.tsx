@@ -3,33 +3,25 @@
 import React, { useState, useEffect } from 'react';
 import { CRMLayout } from "@/components/layout/crm-layout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
   getInvoices, 
-  createInvoice, 
-  getContacts,
-  getJournalEntries,
-  getProducts
+  getJournalEntries
 } from "@/app/lib/crm-service";
 import { 
   Wallet, 
   FileText, 
   CheckCircle, 
   TrendingUp, 
-  Plus, 
-  Search, 
   Loader2,
-  X,
-  AlertCircle,
   Receipt,
-  FileSpreadsheet,
   BookOpen,
-  ArrowUpDown,
-  CheckSquare
+  ArrowRight,
+  ShieldCheck,
+  TrendingDown,
+  Activity
 } from 'lucide-react';
+import Link from 'next/link';
 
 interface InvoiceRecord {
   id: string;
@@ -52,45 +44,10 @@ interface JournalEntryRecord {
   state: string;
 }
 
-interface OdooContact {
-  id: string;
-  name: string;
-  email: string;
-}
-
-interface OdooProduct {
-  id: string;
-  name: string;
-  price: number;
-  sku: string;
-}
-
-export default function AccountingPage() {
+export default function AccountingDashboardPage() {
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [journalEntries, setJournalEntries] = useState<JournalEntryRecord[]>([]);
-  const [contacts, setContacts] = useState<OdooContact[]>([]);
-  const [products, setProducts] = useState<OdooProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'invoices' | 'journals'>('invoices');
-  
-  // Modal states
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Form states
-  const [selectedPartnerId, setSelectedPartnerId] = useState('0');
-  const [selectedProductId, setSelectedProductId] = useState('0');
-  const [quantity, setQuantity] = useState('1');
-  const [confirmAndPost, setConfirmAndPost] = useState(false);
-  const [newAmount, setNewAmount] = useState('');
-  const [newInvoiceDate, setNewInvoiceDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [newDueDate, setNewDueDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 14); // 14 days payment term default
-    return d.toISOString().split('T')[0];
-  });
-  const [newNote, setNewNote] = useState('');
 
   // Currency Formatter
   const formatRupiah = (val: number) => {
@@ -100,6 +57,42 @@ export default function AccountingPage() {
       minimumFractionDigits: 0
     }).format(val);
   };
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const [fetchedInvoices, fetchedJournals] = await Promise.all([
+        getInvoices(),
+        getJournalEntries()
+      ]);
+
+      // Filter specifically for PT VeloCocoa relevant invoices
+      const velococoaInvoices = fetchedInvoices.filter(inv => 
+        inv.partnerName.toLowerCase().includes('velococoa')
+      );
+
+      // Filter specifically for PT VeloCocoa journal entries
+      const velococoaJournals = fetchedJournals.filter(entry => {
+        const text = (entry.name + ' ' + entry.ref).toLowerCase();
+        return text.includes('inv/') || 
+               text.includes('bill/') || 
+               text.includes('pcsh') || 
+               text.includes('pbnk') ||
+               text.includes('velococoa');
+      });
+
+      setInvoices(velococoaInvoices);
+      setJournalEntries(velococoaJournals);
+    } catch (error) {
+      console.error("Failed to load accounting data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   // Stats Calculations
   const totalInvoicesCount = invoices.length;
@@ -116,111 +109,9 @@ export default function AccountingPage() {
     ? ((invoices.filter(inv => inv.paymentState === 'paid').length / totalInvoicesCount) * 100).toFixed(1)
     : '0.0';
 
-  const loadData = async () => {
-    try {
-      setIsLoading(true);
-      const [fetchedInvoices, fetchedContacts, fetchedJournals, fetchedProducts] = await Promise.all([
-        getInvoices(),
-        getContacts(),
-        getJournalEntries(),
-        getProducts()
-      ]);
-
-      // Filter specifically for PT VeloCocoa relevant invoices
-      const velococoaInvoices = fetchedInvoices.filter(inv => 
-        inv.partnerName.toLowerCase().includes('velococoa')
-      );
-
-      // Filter specifically for PT VeloCocoa relevant contacts/partners
-      const velococoaContacts = fetchedContacts.filter(c => 
-        c.name.toLowerCase().includes('velococoa') ||
-        c.name.toLowerCase().includes('harmoni') ||
-        c.name.toLowerCase().includes('klasik') ||
-        c.name.toLowerCase().includes('literasi') ||
-        c.name.toLowerCase().includes('mitra')
-      );
-
-      // Filter specifically for PT VeloCocoa journal entries (bank/cash ref to invoices)
-      const velococoaJournals = fetchedJournals.filter(entry => {
-        const text = (entry.name + ' ' + entry.ref).toLowerCase();
-        return text.includes('inv/') || 
-               text.includes('bill/') || 
-               text.includes('pcsh') || 
-               text.includes('pbnk') ||
-               text.includes('velococoa');
-      });
-
-      setInvoices(velococoaInvoices);
-      setContacts(velococoaContacts);
-      setJournalEntries(velococoaJournals);
-      setProducts(fetchedProducts);
-    } catch (error) {
-      console.error("Failed to load accounting data:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedProductId !== '0') {
-      const prod = products.find(p => p.id === selectedProductId);
-      if (prod) {
-        const calculatedAmount = prod.price * parseFloat(quantity || '0');
-        setNewAmount(String(calculatedAmount));
-      }
-    }
-  }, [selectedProductId, quantity, products]);
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (selectedPartnerId === '0' || !newAmount) return;
-    
-    try {
-      setIsSubmitting(true);
-      const res = await createInvoice(
-        parseInt(selectedPartnerId, 10),
-        parseFloat(newAmount),
-        newInvoiceDate,
-        newDueDate,
-        newNote,
-        selectedProductId !== '0' ? parseInt(selectedProductId, 10) : undefined,
-        parseFloat(quantity || '1'),
-        confirmAndPost
-      );
-      
-      if (res.success) {
-        setIsCreateOpen(false);
-        setSelectedPartnerId('0');
-        setSelectedProductId('0');
-        setQuantity('1');
-        setConfirmAndPost(false);
-        setNewAmount('');
-        setNewNote('');
-        loadData();
-      } else {
-        alert("Gagal membuat invoice di Odoo: " + res.error);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Filter invoices & journal entries based on search input
-  const filteredInvoices = invoices.filter(inv => 
-    inv.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    inv.partnerName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredJournals = journalEntries.filter(entry => 
-    entry.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    entry.ref.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Get recent 5 invoices & 5 journal entries for overview
+  const recentInvoices = invoices.slice(0, 5);
+  const recentJournals = journalEntries.slice(0, 5);
 
   return (
     <CRMLayout>
@@ -230,18 +121,12 @@ export default function AccountingPage() {
         <div className="flex items-center justify-between space-y-2">
           <div>
             <h2 className="text-3xl font-bold tracking-tight text-[#3b1a08] dark:text-white flex items-center gap-2">
-              <Receipt className="h-8 w-8 text-indigo-600 animate-pulse" /> Accounting Dashboard
+              <Wallet className="h-8 w-8 text-indigo-600 animate-bounce" /> Accounting Dashboard
             </h2>
             <p className="text-muted-foreground text-sm">
-              Dashboard khusus finansial PT VeloCocoa Indonesia. Sinkronisasi faktur customer dan entri jurnal pembukuan Odoo secara terpusat.
+              Analisis metrik keuangan realtime, performa tagihan, dan ringkasan mutasi kas PT VeloCocoa Indonesia.
             </p>
           </div>
-          <Button 
-            onClick={() => setIsCreateOpen(true)} 
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/10 flex items-center gap-1.5"
-          >
-            <Plus className="h-5 w-5" /> Buat Invoice Baru
-          </Button>
         </div>
 
         {/* Stats Section */}
@@ -255,22 +140,22 @@ export default function AccountingPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             
             {/* Card 1: Total Receivables */}
-            <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-2xl rounded-full" />
+            <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 blur-2xl rounded-full" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Total Piutang</CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
-                  <Wallet className="h-4 w-4" />
+                <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center">
+                  <TrendingDown className="h-4 w-4" />
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-red-500 dark:text-red-400">{formatRupiah(totalReceivables)}</div>
-                <p className="text-xs text-muted-foreground mt-1">Invoice Belum Lunas (VeloCocoa)</p>
+                <p className="text-xs text-muted-foreground mt-1">Tagihan Belum Lunas (VeloCocoa)</p>
               </CardContent>
             </Card>
 
             {/* Card 2: Total Invoices Count */}
-            <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+            <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
               <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 blur-2xl rounded-full" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Faktur Terbit</CardTitle>
@@ -280,12 +165,12 @@ export default function AccountingPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-[#3b1a08] dark:text-white">{totalInvoicesCount}</div>
-                <p className="text-xs text-muted-foreground mt-1">Total Faktur Dibuat</p>
+                <p className="text-xs text-muted-foreground mt-1">Total Faktur Customer Odoo</p>
               </CardContent>
             </Card>
 
             {/* Card 3: Collection Rate */}
-            <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+            <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
               <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 blur-2xl rounded-full" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Rasio Lunas</CardTitle>
@@ -295,12 +180,12 @@ export default function AccountingPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{collectionRate}%</div>
-                <p className="text-xs text-muted-foreground mt-1">Persentase Sukses Ditagih</p>
+                <p className="text-xs text-muted-foreground mt-1">Rasio Pembayaran Faktur</p>
               </CardContent>
             </Card>
 
             {/* Card 4: Net Revenue Collected */}
-            <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+            <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
               <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 blur-2xl rounded-full" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Kas Masuk</CardTitle>
@@ -317,378 +202,118 @@ export default function AccountingPage() {
           </div>
         )}
 
-        {/* Database List Tab Section */}
-        <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden">
+        {/* Dynamic Navigation Cards & Shortcuts */}
+        <div className="grid gap-6 md:grid-cols-2">
           
-          {/* Navigation Tabs */}
-          <div className="flex border-b border-border/50 bg-muted/20">
-            <button 
-              onClick={() => {
-                setActiveTab('invoices');
-                setSearchQuery('');
-              }}
-              className={`px-6 py-4 font-bold text-sm transition-all border-b-2 flex items-center gap-2 outline-none ${activeTab === 'invoices' ? 'border-indigo-600 text-indigo-600 bg-white dark:bg-[#2A1D16]' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-            >
-              <Receipt className="h-4 w-4" /> Faktur Penjualan (Invoices)
-            </button>
-            <button 
-              onClick={() => {
-                setActiveTab('journals');
-                setSearchQuery('');
-              }}
-              className={`px-6 py-4 font-bold text-sm transition-all border-b-2 flex items-center gap-2 outline-none ${activeTab === 'journals' ? 'border-indigo-600 text-indigo-600 bg-white dark:bg-[#2A1D16]' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-            >
-              <BookOpen className="h-4 w-4" /> Entri Jurnal (Journal Entries)
-            </button>
-          </div>
-
-          <CardHeader className="pb-4">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
-                <CardTitle className="text-xl font-bold text-[#3b1a08] dark:text-white">
-                  {activeTab === 'invoices' ? "Daftar Invoices PT VeloCocoa" : "Entri Jurnal & Buku Besar"}
+          {/* Box 1: Faktur Penjualan Shortcut */}
+          <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden hover:scale-[1.01] transition-transform duration-300 flex flex-col justify-between">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl font-bold text-[#3b1a08] dark:text-white flex items-center gap-2">
+                  <Receipt className="h-6 w-6 text-indigo-600" /> Modul Faktur Penjualan (Invoices)
                 </CardTitle>
-                <CardDescription>
-                  {activeTab === 'invoices' 
-                    ? "Menampilkan tagihan penjualan customer terintegrasi modul Odoo account.move." 
-                    : "Menampilkan mutasi keuangan kas/bank dan buku jurnal akuntansi dari Odoo ERP."
-                  }
-                </CardDescription>
+                <span className="text-xs bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300 px-3 py-1 rounded-full font-bold">
+                  Odoo Active Sync
+                </span>
               </div>
-              
-              {/* Search Bar */}
-              <div className="relative max-w-sm w-full">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder={activeTab === 'invoices' ? "Cari nomor invoice atau customer..." : "Cari kode jurnal atau referensi..."} 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 bg-background border-border"
-                />
+              <CardDescription className="pt-2">
+                Kelola customer billing PT VeloCocoa, integrasikan dengan katalog produk Odoo, kelola volume pembelian customer, serta post faktur secara instan.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-slate-50 dark:bg-slate-900/30 p-4 rounded-xl space-y-2 text-sm">
+                <div className="flex justify-between items-center text-xs border-b border-border/40 pb-2">
+                  <span className="font-semibold text-muted-foreground">INVOICE TERBARU</span>
+                  <span className="font-semibold text-muted-foreground">NILAI</span>
+                </div>
+                {isLoading ? (
+                  <div className="h-12 flex items-center justify-center text-xs text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin mr-1 text-indigo-600" /> Memuat data...
+                  </div>
+                ) : recentInvoices.length === 0 ? (
+                  <div className="text-xs text-muted-foreground text-center py-2">Tidak ada invoice aktif</div>
+                ) : (
+                  recentInvoices.map(inv => (
+                    <div key={inv.id} className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-slate-700 dark:text-slate-300 truncate max-w-[200px]">
+                        {inv.name} - {inv.partnerName}
+                      </span>
+                      <span className="font-bold text-indigo-600 dark:text-indigo-400">{formatRupiah(inv.amountTotal)}</span>
+                    </div>
+                  ))
+                )}
               </div>
+              <Link href="/accounting/invoices" className="w-full block">
+                <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-indigo-500/10">
+                  Buka Faktur Penjualan <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* Box 2: Journal Entries Shortcut */}
+          <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden hover:scale-[1.01] transition-transform duration-300 flex flex-col justify-between">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl font-bold text-[#3b1a08] dark:text-white flex items-center gap-2">
+                  <BookOpen className="h-6 w-6 text-slate-600" /> Modul Journal Entries (Jurnal)
+                </CardTitle>
+                <span className="text-xs bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-300 px-3 py-1 rounded-full font-bold">
+                  Buku Besar
+                </span>
+              </div>
+              <CardDescription className="pt-2">
+                Pantau log pembukuan kas/bank secara akurat, kelola debit/kredit mutasi, dan lakukan auditing transaksi internal ERP secara tersinkronisasi.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-slate-50 dark:bg-slate-900/30 p-4 rounded-xl space-y-2 text-sm">
+                <div className="flex justify-between items-center text-xs border-b border-border/40 pb-2">
+                  <span className="font-semibold text-muted-foreground">KODE JURNAL</span>
+                  <span className="font-semibold text-muted-foreground">MUTASI KAS</span>
+                </div>
+                {isLoading ? (
+                  <div className="h-12 flex items-center justify-center text-xs text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin mr-1 text-slate-600" /> Memuat data...
+                  </div>
+                ) : recentJournals.length === 0 ? (
+                  <div className="text-xs text-muted-foreground text-center py-2">Tidak ada entri jurnal aktif</div>
+                ) : (
+                  recentJournals.map(j => (
+                    <div key={j.id} className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-slate-700 dark:text-slate-300 truncate max-w-[200px]">
+                        {j.name} - {j.ref || "Manual"}
+                      </span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">{formatRupiah(j.amountTotal)}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+              <Link href="/accounting/journals" className="w-full block">
+                <Button variant="outline" className="w-full hover:bg-muted font-bold rounded-xl flex items-center justify-center gap-1.5">
+                  Buka Entri Jurnal <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+        </div>
+
+        {/* Security / Connection Footer Widget */}
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 text-emerald-800 dark:text-emerald-400 text-xs">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 animate-pulse" />
+            <div>
+              <span className="font-bold">Koneksi ERP Odoo Aman & Terenkripsi</span>
+              <p className="text-[10px] text-emerald-800/80 dark:text-emerald-400/80">
+                Semua data invoice, katalog produk, volume kuantitas, dan mutasi entri jurnal disinkronkan secara langsung menggunakan XML-RPC API yang aman.
+              </p>
             </div>
-          </CardHeader>
-
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-3">
-                <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-                <span>Menarik data akuntansi dari Odoo ERP...</span>
-              </div>
-            ) : activeTab === 'invoices' ? (
-              /* TAB 1: INVOICES TABLE */
-              filteredInvoices.length === 0 ? (
-                <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-2">
-                  <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
-                  <span className="font-semibold text-[#3b1a08] dark:text-white">Tidak ada invoice ditemukan</span>
-                  <span className="text-xs">Ubah filter pencarian atau buat invoice baru.</span>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left border-collapse">
-                    <thead>
-                      <tr className="bg-muted/40 border-b border-border/50 text-xs font-semibold text-muted-foreground uppercase">
-                        <th className="px-6 py-4">Faktur / Invoice</th>
-                        <th className="px-6 py-4">Mitra Customer</th>
-                        <th className="px-6 py-4 text-center">Tanggal</th>
-                        <th className="px-6 py-4 text-center">Jatuh Tempo</th>
-                        <th className="px-6 py-4 text-right">Total Tagihan</th>
-                        <th className="px-6 py-4 text-center">Bayar</th>
-                        <th className="px-6 py-4 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/30">
-                      {filteredInvoices.map(inv => (
-                        <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
-                          <td className="px-6 py-4 font-bold text-indigo-600 max-w-xs truncate flex items-center gap-1.5">
-                            <FileSpreadsheet className="h-4 w-4 text-indigo-400" /> {inv.name}
-                          </td>
-                          <td className="px-6 py-4 font-semibold text-[#3b1a08] dark:text-white max-w-xs truncate">
-                            {inv.partnerName}
-                          </td>
-                          <td className="px-6 py-4 text-center text-muted-foreground text-xs font-medium">
-                            {inv.invoiceDate || "-"}
-                          </td>
-                          <td className="px-6 py-4 text-center text-muted-foreground text-xs font-medium">
-                            {inv.invoiceDateDue || "-"}
-                          </td>
-                          <td className="px-6 py-4 text-right font-bold text-[#3b1a08] dark:text-white">
-                            {formatRupiah(inv.amountTotal)}
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            {inv.paymentState === 'paid' && (
-                              <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full text-xs font-black">
-                                Lunas
-                              </span>
-                            )}
-                            {inv.paymentState === 'not_paid' && (
-                              <span className="bg-rose-500/10 text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded-full text-xs font-black">
-                                Belum Lunas
-                              </span>
-                            )}
-                            {inv.paymentState === 'partial' && (
-                              <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full text-xs font-black">
-                                Sebagian
-                              </span>
-                            )}
-                            {inv.paymentState === 'in_payment' && (
-                              <span className="bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full text-xs font-black animate-pulse">
-                                Proses Bayar
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            {inv.state === 'posted' && (
-                              <span className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                                Diposting
-                              </span>
-                            )}
-                            {inv.state === 'draft' && (
-                              <span className="bg-slate-500/10 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                                Draft
-                              </span>
-                            )}
-                            {inv.state === 'cancel' && (
-                              <span className="bg-red-500/10 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                                Dibatalkan
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )
-            ) : (
-              /* TAB 2: JOURNAL ENTRIES TABLE */
-              filteredJournals.length === 0 ? (
-                <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-2">
-                  <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
-                  <span className="font-semibold text-[#3b1a08] dark:text-white">Tidak ada entri jurnal ditemukan</span>
-                  <span className="text-xs">Ubah filter pencarian atau pastikan transaksi sinkron.</span>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left border-collapse">
-                    <thead>
-                      <tr className="bg-muted/40 border-b border-border/50 text-xs font-semibold text-muted-foreground uppercase">
-                        <th className="px-6 py-4">Kode Jurnal (Journal Entry)</th>
-                        <th className="px-6 py-4">Referensi Dokumen</th>
-                        <th className="px-6 py-4 text-center">Tanggal Transaksi</th>
-                        <th className="px-6 py-4 text-right">Nilai Mutasi</th>
-                        <th className="px-6 py-4 text-center">Status Pembukuan</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/30">
-                      {filteredJournals.map(entry => (
-                        <tr key={entry.id} className="hover:bg-muted/20 transition-colors">
-                          <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200 max-w-xs truncate flex items-center gap-1.5">
-                            <BookOpen className="h-4 w-4 text-slate-400" /> {entry.name}
-                          </td>
-                          <td className="px-6 py-4 font-semibold text-indigo-600 max-w-xs truncate">
-                            {entry.ref || <span className="italic text-muted-foreground/50">Manual Entry</span>}
-                          </td>
-                          <td className="px-6 py-4 text-center text-muted-foreground text-xs font-medium">
-                            {entry.date}
-                          </td>
-                          <td className="px-6 py-4 text-right font-black text-slate-800 dark:text-white">
-                            {formatRupiah(entry.amountTotal)}
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            {entry.state === 'posted' ? (
-                              <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-full text-xs font-black flex items-center justify-center mx-auto w-fit gap-1">
-                                <CheckSquare className="h-3.5 w-3.5" /> Terposting
-                              </span>
-                            ) : (
-                              <span className="bg-slate-500/10 text-slate-600 dark:text-slate-400 px-2.5 py-1 rounded-full text-xs font-black flex items-center justify-center mx-auto w-fit gap-1">
-                                <FileText className="h-3.5 w-3.5" /> Draft
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Modal: Create Invoice */}
-        {isCreateOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 p-4">
-            <form 
-              onSubmit={handleSubmit}
-              className="bg-card w-full max-w-lg p-6 rounded-2xl shadow-2xl border border-primary/20 space-y-4 text-left max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex items-center justify-between border-b border-border/30 pb-3">
-                <h2 className="text-xl font-bold flex items-center gap-2 text-foreground">
-                  <Receipt className="h-6 w-6 text-indigo-600" /> Buat Invoice Baru (Odoo Sync)
-                </h2>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => setIsCreateOpen(false)}
-                  className="text-muted-foreground hover:bg-muted/10"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-
-              {/* Customer */}
-              <div className="space-y-1.5">
-                <Label htmlFor="partner" className="text-xs font-semibold">Mitra Customer (Odoo Contact)</Label>
-                <select 
-                  id="partner"
-                  value={selectedPartnerId}
-                  onChange={(e) => setSelectedPartnerId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-primary/20 bg-background text-sm focus-visible:ring-indigo-600 focus-visible:ring-2 focus-visible:ring-offset-2 outline-none font-semibold text-foreground"
-                  required
-                >
-                  <option value="0">--- Pilih Kontak Customer ---</option>
-                  {contacts.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} {c.email ? `(${c.email})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Product & Quantity (Volume) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="product" className="text-xs font-semibold">Pilih Produk Odoo (VeloCocoa Catalog)</Label>
-                  <select 
-                    id="product"
-                    value={selectedProductId}
-                    onChange={(e) => setSelectedProductId(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-primary/20 bg-background text-sm focus-visible:ring-indigo-600 focus-visible:ring-2 focus-visible:ring-offset-2 outline-none font-medium text-foreground"
-                  >
-                    <option value="0">--- Input Manual / Lainnya ---</option>
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({formatRupiah(p.price)})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="quantity" className="text-xs font-semibold">Volume Pembelian (Kuantitas)</Label>
-                  <Input 
-                    id="quantity"
-                    type="number"
-                    min="1"
-                    step="any"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    className="bg-background border-primary/20"
-                    placeholder="Contoh: 10"
-                  />
-                </div>
-              </div>
-
-              {/* Amount */}
-              <div className="space-y-1.5">
-                <Label htmlFor="amount" className="text-xs font-semibold">Total Nilai Tagihan (IDR)</Label>
-                <Input 
-                  id="amount"
-                  type="number"
-                  placeholder="Contoh: 5000000 (untuk Rp 5.000.000)"
-                  value={newAmount}
-                  onChange={(e) => setNewAmount(e.target.value)}
-                  className="bg-background border-primary/20 font-bold text-indigo-600 dark:text-indigo-400"
-                  required
-                />
-              </div>
-
-              {/* Invoice Date & Due Date */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="invDate" className="text-xs font-semibold">Tanggal Faktur</Label>
-                  <Input 
-                    id="invDate"
-                    type="date"
-                    value={newInvoiceDate}
-                    onChange={(e) => setNewInvoiceDate(e.target.value)}
-                    className="bg-background border-primary/20 text-sm"
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="dueDate" className="text-xs font-semibold">Jatuh Tempo</Label>
-                  <Input 
-                    id="dueDate"
-                    type="date"
-                    value={newDueDate}
-                    onChange={(e) => setNewDueDate(e.target.value)}
-                    className="bg-background border-primary/20 text-sm"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Note / Item Description */}
-              <div className="space-y-1.5">
-                <Label htmlFor="note" className="text-xs font-semibold">Deskripsi Tagihan / Memo Invoice</Label>
-                <Textarea 
-                  id="note"
-                  placeholder="Contoh: Pembelian Cokelat Couverture Buttons 100kg & Toppings untuk Cafe Harmoni"
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  className="bg-background border-primary/20 text-sm font-medium"
-                  required
-                />
-              </div>
-
-              {/* Auto Confirm & Post option */}
-              <div className="flex items-center space-x-2 p-3 bg-indigo-50/50 dark:bg-slate-900/30 rounded-xl border border-indigo-100 dark:border-slate-800">
-                <input 
-                  type="checkbox" 
-                  id="confirmAndPost"
-                  checked={confirmAndPost}
-                  onChange={(e) => setConfirmAndPost(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                />
-                <label htmlFor="confirmAndPost" className="text-xs font-bold cursor-pointer text-indigo-950 dark:text-slate-200">
-                  Konfirmasi & Posting Resmi (Ubah status Draft menjadi Diposting secara realtime di Odoo)
-                </label>
-              </div>
-
-              {/* Info alert */}
-              <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-xs text-indigo-600 dark:text-indigo-400 leading-relaxed">
-                Submit invoice akan otomatis membuat faktur <b>{confirmAndPost ? "Diposting (Resmi)" : "Draft"}</b> baru di Odoo ERP lengkap dengan baris produk dan kuantitas volume yang dikalkulasi pajaknya secara instan.
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-3 border-t border-border/30">
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-                      Memproses di Odoo...
-                    </>
-                  ) : confirmAndPost ? "Posting Resmi & Konfirmasi" : "Buat Faktur Draft"}
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  onClick={() => setIsCreateOpen(false)}
-                  className="text-muted-foreground hover:bg-muted/10 font-medium"
-                >
-                  Batal
-                </Button>
-              </div>
-            </form>
           </div>
-        )}
+          <div className="flex items-center gap-1.5 font-bold bg-emerald-600 text-white px-3 py-1 rounded-lg w-fit">
+            <Activity className="h-3.5 w-3.5" /> Terhubung Realtime
+          </div>
+        </div>
 
       </div>
     </CRMLayout>
