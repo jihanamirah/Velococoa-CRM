@@ -472,6 +472,41 @@ export async function createOdooUtmCampaign(title: string, name: string) {
   }
 }
 
+export async function payOdooInvoice(invoiceId: number, amount: number, paymentDate: string, journalType: 'bank' | 'cash') {
+  try {
+    // 1. Find journal_id of specified type (bank or cash)
+    const journals = await execute('account.journal', 'search_read', [
+      [['type', '=', journalType === 'bank' ? 'bank' : 'cash']],
+      ['id', 'name']
+    ]);
+    
+    if (journals.length === 0) {
+      throw new Error(`Odoo journal of type ${journalType} not found.`);
+    }
+    const journalId = journals[0].id;
+
+    // 2. Create the account.payment.register wizard record
+    const context = {
+      active_model: 'account.move',
+      active_ids: [invoiceId]
+    };
+
+    const wizardId = await execute('account.payment.register', 'create', [{
+      payment_date: paymentDate,
+      journal_id: journalId,
+      amount: amount
+    }], { context });
+
+    // 3. Confirm payment to reconcile invoice
+    await execute('account.payment.register', 'action_create_payments', [[wizardId]], { context });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('payOdooInvoice failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 
 
 

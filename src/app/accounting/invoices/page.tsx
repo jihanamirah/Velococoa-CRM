@@ -11,7 +11,8 @@ import {
   getInvoices, 
   createInvoice, 
   getContacts,
-  getProducts
+  getProducts,
+  payInvoice
 } from "@/app/lib/crm-service";
 import { 
   Receipt,
@@ -20,7 +21,10 @@ import {
   Search, 
   Loader2,
   X,
-  AlertCircle
+  AlertCircle,
+  CreditCard,
+  Coins,
+  CheckCircle
 } from 'lucide-react';
 
 interface InvoiceRecord {
@@ -58,6 +62,14 @@ export default function InvoicesPage() {
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Payment states
+  const [isPayOpen, setIsPayOpen] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+  const [activeInvoice, setActiveInvoice] = useState<InvoiceRecord | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payDate, setPayDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [payJournalType, setPayJournalType] = useState<'bank' | 'cash'>('bank');
   
   // Form states
   const [selectedPartnerId, setSelectedPartnerId] = useState('0');
@@ -72,6 +84,42 @@ export default function InvoicesPage() {
     return d.toISOString().split('T')[0];
   });
   const [newNote, setNewNote] = useState('');
+
+  const handleOpenPay = (inv: InvoiceRecord) => {
+    setActiveInvoice(inv);
+    setPayAmount(String(inv.amountTotal));
+    setPayDate(new Date().toISOString().split('T')[0]);
+    setPayJournalType('bank');
+    setIsPayOpen(true);
+  };
+
+  const handlePaySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeInvoice || !payAmount) return;
+    
+    try {
+      setIsPaying(true);
+      const res = await payInvoice(
+        parseInt(activeInvoice.id, 10),
+        parseFloat(payAmount),
+        payDate,
+        payJournalType
+      );
+      
+      if (res.success) {
+        setIsPayOpen(false);
+        setActiveInvoice(null);
+        setPayAmount('');
+        loadData();
+      } else {
+        alert("Gagal mencatat pembayaran di Odoo: " + res.error);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsPaying(false);
+    }
+  };
 
   // Currency Formatter
   const formatRupiah = (val: number) => {
@@ -241,6 +289,7 @@ export default function InvoicesPage() {
                       <th className="px-6 py-4 text-right">Total Tagihan</th>
                       <th className="px-6 py-4 text-center">Bayar</th>
                       <th className="px-6 py-4 text-center">Status</th>
+                      <th className="px-6 py-4 text-center">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/30">
@@ -297,6 +346,23 @@ export default function InvoicesPage() {
                           {inv.state === 'cancel' && (
                             <span className="bg-red-500/10 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
                               Dibatalkan
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {inv.state === 'posted' && inv.paymentState !== 'paid' ? (
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleOpenPay(inv)}
+                              className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1 shadow-md shadow-emerald-500/10 mx-auto"
+                            >
+                              <CreditCard className="h-3 w-3" /> Bayar
+                            </Button>
+                          ) : inv.state === 'draft' ? (
+                            <span className="text-xs text-muted-foreground italic font-semibold">Post dulu</span>
+                          ) : (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center justify-center gap-0.5">
+                              <CheckCircle className="h-3.5 w-3.5" /> Selesai
                             </span>
                           )}
                         </td>
@@ -474,6 +540,109 @@ export default function InvoicesPage() {
                   type="button" 
                   variant="ghost" 
                   onClick={() => setIsCreateOpen(false)}
+                  className="text-muted-foreground hover:bg-muted/10 font-medium"
+                >
+                  Batal
+                </Button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Modal: Register Payment */}
+        {isPayOpen && activeInvoice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 p-4">
+            <form 
+              onSubmit={handlePaySubmit}
+              className="bg-card w-full max-w-md p-6 rounded-2xl shadow-2xl border border-primary/20 space-y-4 text-left"
+            >
+              <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                <h2 className="text-xl font-bold flex items-center gap-2 text-foreground">
+                  <CreditCard className="h-6 w-6 text-emerald-600 animate-pulse" /> Catat Pembayaran Odoo
+                </h2>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setIsPayOpen(false)}
+                  className="text-muted-foreground hover:bg-muted/10"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              {/* Invoice Info */}
+              <div className="bg-emerald-500/10 p-3.5 rounded-xl border border-emerald-500/20 text-emerald-800 dark:text-emerald-400 space-y-1">
+                <div className="text-xs font-bold uppercase tracking-wider">Membayar Invoice</div>
+                <div className="text-sm font-black">{activeInvoice.name}</div>
+                <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-400/80">Customer: {activeInvoice.partnerName}</div>
+              </div>
+
+              {/* Payment Method */}
+              <div className="space-y-1.5">
+                <Label htmlFor="paymentMethod" className="text-xs font-semibold">Metode Pembayaran (Journal)</Label>
+                <select 
+                  id="paymentMethod"
+                  value={payJournalType}
+                  onChange={(e) => setPayJournalType(e.target.value as 'bank' | 'cash')}
+                  className="w-full h-10 px-3 rounded-lg border border-primary/20 bg-background text-sm focus-visible:ring-emerald-500 focus-visible:ring-2 focus-visible:ring-offset-2 outline-none font-semibold text-foreground"
+                  required
+                >
+                  <option value="bank">Bank Transfer (PT VeloCocoa Bank)</option>
+                  <option value="cash">Cash / Tunai (Kas Kecil Jakarta)</option>
+                </select>
+              </div>
+
+              {/* Payment Date */}
+              <div className="space-y-1.5">
+                <Label htmlFor="payDate" className="text-xs font-semibold">Tanggal Pembayaran</Label>
+                <Input 
+                  id="payDate"
+                  type="date"
+                  value={payDate}
+                  onChange={(e) => setPayDate(e.target.value)}
+                  className="bg-background border-primary/20 text-sm"
+                  required
+                />
+              </div>
+
+              {/* Payment Amount */}
+              <div className="space-y-1.5">
+                <Label htmlFor="payAmount" className="text-xs font-semibold">Jumlah Pembayaran (IDR)</Label>
+                <Input 
+                  id="payAmount"
+                  type="number"
+                  placeholder="Jumlah bayar"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  className="bg-background border-primary/20 font-bold text-emerald-600 dark:text-emerald-400"
+                  required
+                />
+              </div>
+
+              {/* Info alert */}
+              <div className="p-3 bg-slate-500/10 border border-slate-500/20 rounded-xl text-xs text-muted-foreground leading-relaxed">
+                Pencatatan pembayaran ini akan otomatis membuat entri jurnal pembayaran baru di Odoo ERP dan merekonsiliasikannya ke invoice, sehingga status tagihan menjadi <b>Lunas</b> secara realtime.
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-3 border-t border-border/30">
+                <Button 
+                  type="submit" 
+                  disabled={isPaying}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                >
+                  {isPaying ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                      Membayar...
+                    </>
+                  ) : "Konfirmasi Pembayaran Lunas"}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  onClick={() => setIsPayOpen(false)}
                   className="text-muted-foreground hover:bg-muted/10 font-medium"
                 >
                   Batal
