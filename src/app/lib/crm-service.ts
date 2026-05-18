@@ -21,7 +21,11 @@ import {
   getOdooUtmCampaigns,
   getOdooInvoices,
   createOdooInvoice,
-  getOdooJournalEntries
+  getOdooJournalEntries,
+  getOdooMailingLists,
+  createOdooMailingList,
+  getOdooMailingContacts,
+  createOdooMailingContact
 } from '@/services/odoo';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -478,5 +482,45 @@ export async function getJournalEntries() {
       state: String(entry.state || 'draft')
     };
   });
+}
+
+export async function getMailingLists() {
+  const raw = await getOdooMailingLists();
+  return raw.map((list: any) => {
+    return {
+      id: String(list.id || ''),
+      name: String(list.name || ''),
+      contactCount: Number(list.contact_count || 0)
+    };
+  });
+}
+
+export async function createMailingList(name: string) {
+  return await createOdooMailingList(name);
+}
+
+export async function getMailingContacts() {
+  const raw = await getOdooMailingContacts();
+  return raw.map((contact: any) => {
+    let listIds: number[] = [];
+    if (Array.isArray(contact.list_ids)) {
+      listIds = contact.list_ids;
+    } else if (typeof contact.list_ids === 'number') {
+      listIds = [contact.list_ids];
+    } else if (contact.list_ids) {
+      listIds = [parseInt(contact.list_ids, 10)];
+    }
+    
+    return {
+      id: String(contact.id || ''),
+      name: String(contact.name || 'No Name'),
+      email: String(contact.email || ''),
+      listIds: listIds
+    };
+  });
+}
+
+export async function createMailingContact(name: string, email: string, listId: number) {
+  return await createOdooMailingContact(name, email, listId);
 }
 

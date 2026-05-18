@@ -369,5 +369,56 @@ export async function getOdooJournalEntries() {
   }
 }
 
+export async function getOdooMailingLists() {
+  try {
+    const rawXml = await execute('mailing.list', 'search_read', [[]], {
+      fields: ['id', 'name', 'contact_count'],
+      limit: 100
+    });
+    return parseOdooRecords(rawXml);
+  } catch (error) {
+    console.error('getOdooMailingLists failed:', error);
+    return [];
+  }
+}
+
+export async function createOdooMailingList(name: string) {
+  try {
+    const newListId = await execute('mailing.list', 'create', [{ name }]);
+    return { success: true, data: newListId };
+  } catch (error: any) {
+    console.error('createOdooMailingList failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getOdooMailingContacts() {
+  try {
+    const rawXml = await execute('mailing.contact', 'search_read', [[]], {
+      fields: ['id', 'name', 'email', 'list_ids'],
+      limit: 500
+    });
+    return parseOdooRecords(rawXml);
+  } catch (error) {
+    console.error('getOdooMailingContacts failed:', error);
+    return [];
+  }
+}
+
+export async function createOdooMailingContact(name: string, email: string, listId: number) {
+  try {
+    const params = {
+      name,
+      email,
+      list_ids: [[6, 0, [listId]]] // Link relation to list securely
+    };
+    const newContactId = await execute('mailing.contact', 'create', [params]);
+    return { success: true, data: newContactId };
+  } catch (error: any) {
+    console.error('createOdooMailingContact failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 
 

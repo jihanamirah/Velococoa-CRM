@@ -10,7 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { 
   getMailings, 
   createMailing, 
-  getUtmCampaigns 
+  getUtmCampaigns,
+  getMailingLists,
+  createMailingList,
+  getMailingContacts,
+  createMailingContact
 } from "@/app/lib/crm-service";
 import { 
   Megaphone, 
@@ -25,9 +29,12 @@ import {
   Loader2,
   X,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Users2,
+  UserPlus,
+  FolderPlus,
+  Database
 } from 'lucide-react';
-import { useToast } from "@/hooks/use-toast";
 
 interface MailingCampaign {
   id: string;
@@ -48,23 +55,50 @@ interface UtmCampaign {
   title: string;
 }
 
+interface MailingListRecord {
+  id: string;
+  name: string;
+  contactCount: number;
+}
+
+interface MailingContactRecord {
+  id: string;
+  name: string;
+  email: string;
+  listIds: number[];
+}
+
 export default function MarketingPage() {
   const [mailings, setMailings] = useState<MailingCampaign[]>([]);
   const [utmCampaigns, setUtmCampaigns] = useState<UtmCampaign[]>([]);
+  const [mailingLists, setMailingLists] = useState<MailingListRecord[]>([]);
+  const [mailingContacts, setMailingContacts] = useState<MailingContactRecord[]>([]);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'lists'>('campaigns');
   
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isCreateListOpen, setIsCreateListOpen] = useState(false);
+  const [isAddContactOpen, setIsAddContactOpen] = useState(false);
   const [selectedMailing, setSelectedMailing] = useState<MailingCampaign | null>(null);
   
-  // Form states
+  // Form states (Campaign)
   const [newSubject, setNewSubject] = useState('');
   const [selectedUtmId, setSelectedUtmId] = useState('0');
   const [selectedTemplate, setSelectedTemplate] = useState('CUSTOM');
   const [newBodyHtml, setNewBodyHtml] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Form states (List & Contact)
+  const [newListName, setNewListName] = useState('');
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactEmail, setNewContactEmail] = useState('');
+  const [selectedListId, setSelectedListId] = useState('0');
+  const [isListSubmitting, setIsListSubmitting] = useState(false);
+  const [isContactSubmitting, setIsContactSubmitting] = useState(false);
 
   // Stats calculation
   const totalCampaigns = mailings.length;
@@ -79,12 +113,14 @@ export default function MarketingPage() {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const [fetchedMailings, fetchedUtms] = await Promise.all([
+      const [fetchedMailings, fetchedUtms, fetchedLists, fetchedContacts] = await Promise.all([
         getMailings(),
-        getUtmCampaigns()
+        getUtmCampaigns(),
+        getMailingLists(),
+        getMailingContacts()
       ]);
       
-      // Filter specifically for PT VeloCocoa relevant marketing data
+      // Filter specifically for PT VeloCocoa relevant campaign data
       const velococoaMailings = fetchedMailings.filter(m => {
         const text = (m.subject + ' ' + m.campaignName + ' ' + m.bodyHtml).toLowerCase();
         return text.includes('velococoa') || 
@@ -107,8 +143,25 @@ export default function MarketingPage() {
                text.includes('campaign');
       });
 
+      // Filter specifically for PT VeloCocoa relevant mailing lists
+      const velococoaLists = fetchedLists.filter(l => {
+        const text = l.name.toLowerCase();
+        return text.includes('velococoa') || 
+               text.includes('mitra') || 
+               text.includes('ethicocoa') || 
+               text.includes('chocora') || 
+               text.includes('cafe') || 
+               text.includes('partnership') || 
+               text.includes('distributor') || 
+               text.includes('retail') ||
+               text.includes('hospitality') ||
+               text.includes('satyagraha');
+      });
+
       setMailings(velococoaMailings);
       setUtmCampaigns(velococoaUtms);
+      setMailingLists(velococoaLists);
+      setMailingContacts(fetchedContacts);
     } catch (error) {
       console.error("Failed to load marketing data:", error);
     } finally {
@@ -210,11 +263,66 @@ export default function MarketingPage() {
     }
   };
 
+  const handleCreateListSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newListName.trim()) return;
+    try {
+      setIsListSubmitting(true);
+      const res = await createMailingList(newListName);
+      if (res.success) {
+        setIsCreateListOpen(false);
+        setNewListName('');
+        loadData();
+      } else {
+        alert("Gagal membuat mailing list di Odoo: " + res.error);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsListSubmitting(false);
+    }
+  };
+
+  const handleAddContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newContactEmail.trim() || selectedListId === '0') return;
+    try {
+      setIsContactSubmitting(true);
+      const res = await createMailingContact(
+        newContactName || 'Pelanggan Anonim',
+        newContactEmail,
+        parseInt(selectedListId, 10)
+      );
+      if (res.success) {
+        setIsAddContactOpen(false);
+        setNewContactName('');
+        setNewContactEmail('');
+        setSelectedListId('0');
+        loadData();
+      } else {
+        alert("Gagal menambah kontak di Odoo: " + res.error);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsContactSubmitting(false);
+    }
+  };
+
   // Filter campaigns
   const filteredMailings = mailings.filter(m => 
     m.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
     m.campaignName.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Filter contacts by search query or list name
+  const filteredContacts = mailingContacts.filter(c => {
+    const query = searchQuery.toLowerCase();
+    const matchesQuery = c.name.toLowerCase().includes(query) || c.email.toLowerCase().includes(query);
+    
+    if (!matchesQuery) return false;
+    return true;
+  });
 
   return (
     <CRMLayout>
@@ -224,226 +332,405 @@ export default function MarketingPage() {
         <div className="flex items-center justify-between space-y-2">
           <div>
             <h2 className="text-3xl font-bold tracking-tight text-[#3b1a08] dark:text-white flex items-center gap-2">
-              <Megaphone className="h-8 w-8 text-[#D05A1E]" /> Marketing Automation
+              <Megaphone className="h-8 w-8 text-[#D05A1E] animate-pulse" /> Marketing Dashboard
             </h2>
             <p className="text-muted-foreground text-sm">
-              Kelola kampanye broadcast mass email PT VeloCocoa Indonesia dan pantau analitik integrasi Odoo secara langsung.
+              Kelola kampanye email massal, UTM link, dan segmen mailing list customer PT VeloCocoa Indonesia secara terpadu.
             </p>
           </div>
-          <Button 
-            onClick={() => {
-              handleTemplateChange('CAFE'); // Default to cafe template on open
-              setIsCreateOpen(true);
-            }} 
-            className="bg-[#D05A1E] hover:bg-[#B34914] text-white font-bold rounded-xl shadow-lg shadow-orange-500/10 flex items-center gap-1.5"
-          >
-            <Plus className="h-5 w-5" /> Buat Kampanye Baru
-          </Button>
+          
+          <div className="flex items-center gap-3">
+            {activeTab === 'campaigns' ? (
+              <Button 
+                onClick={() => {
+                  handleTemplateChange('CAFE');
+                  setIsCreateOpen(true);
+                }} 
+                className="bg-[#D05A1E] hover:bg-[#B34914] text-white font-bold rounded-xl shadow-lg shadow-orange-500/10 flex items-center gap-1.5"
+              >
+                <Plus className="h-5 w-5" /> Buat Kampanye Baru
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => setIsCreateListOpen(true)}
+                  variant="outline"
+                  className="border-[#D05A1E] text-[#D05A1E] hover:bg-[#D05A1E]/10 font-bold rounded-xl flex items-center gap-1.5"
+                >
+                  <FolderPlus className="h-4 w-4" /> Mailing List Baru
+                </Button>
+                <Button 
+                  onClick={() => setIsAddContactOpen(true)} 
+                  className="bg-[#D05A1E] hover:bg-[#B34914] text-white font-bold rounded-xl shadow-lg shadow-orange-500/10 flex items-center gap-1.5"
+                >
+                  <UserPlus className="h-4 w-4" /> Tambah Kontak
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Stats Section */}
-        {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 animate-pulse">
-            {[1, 2, 3, 4].map(idx => (
-              <div key={idx} className="h-28 bg-muted rounded-2xl border border-border/50" />
-            ))}
+        {/* Tab Selection */}
+        <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden">
+          <div className="flex border-b border-border/50 bg-muted/20">
+            <button 
+              onClick={() => {
+                setActiveTab('campaigns');
+                setSearchQuery('');
+              }}
+              className={`px-6 py-4 font-bold text-sm transition-all border-b-2 flex items-center gap-2 outline-none ${activeTab === 'campaigns' ? 'border-[#D05A1E] text-[#D05A1E] bg-white dark:bg-[#2A1D16]' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            >
+              <Megaphone className="h-4 w-4" /> Kampanye Email Massal
+            </button>
+            <button 
+              onClick={() => {
+                setActiveTab('lists');
+                setSearchQuery('');
+              }}
+              className={`px-6 py-4 font-bold text-sm transition-all border-b-2 flex items-center gap-2 outline-none ${activeTab === 'lists' ? 'border-[#D05A1E] text-[#D05A1E] bg-white dark:bg-[#2A1D16]' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            >
+              <Users2 className="h-4 w-4" /> Mailing List & Kontak
+            </button>
           </div>
+        </Card>
+
+        {activeTab === 'campaigns' ? (
+          <>
+            {/* Stats Section */}
+            {isLoading ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 animate-pulse">
+                {[1, 2, 3, 4].map(idx => (
+                  <div key={idx} className="h-28 bg-muted rounded-2xl border border-border/50" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                
+                {/* Card 1: Total Campaigns */}
+                <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/5 blur-2xl rounded-full" />
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-semibold text-muted-foreground">Total Kampanye</CardTitle>
+                    <div className="w-8 h-8 rounded-lg bg-[#D05A1E]/10 text-[#D05A1E] flex items-center justify-center">
+                      <Megaphone className="h-4 w-4" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-[#3b1a08] dark:text-white">{totalCampaigns}</div>
+                    <p className="text-xs text-muted-foreground mt-1">Broadcast VeloCocoa di Odoo</p>
+                  </CardContent>
+                </Card>
+
+                {/* Card 2: Total Sent */}
+                <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 blur-2xl rounded-full" />
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-semibold text-muted-foreground">Email Terkirim</CardTitle>
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                      <Send className="h-4 w-4" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-[#3b1a08] dark:text-white">{totalSent}</div>
+                    <p className="text-xs text-muted-foreground mt-1">Total Broadcast Sukses</p>
+                  </CardContent>
+                </Card>
+
+                {/* Card 3: Open Rate */}
+                <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 blur-2xl rounded-full" />
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-semibold text-muted-foreground">Rata-rata Terbuka</CardTitle>
+                    <div className="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 flex items-center justify-center">
+                      <MailOpen className="h-4 w-4" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-orange-500">{avgOpenRate}%</div>
+                    <p className="text-xs text-muted-foreground mt-1">Open Rate Terbaca</p>
+                  </CardContent>
+                </Card>
+
+                {/* Card 4: Click Rate */}
+                <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-2xl rounded-full" />
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-semibold text-muted-foreground">Rata-rata Klik</CardTitle>
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+                      <MousePointerClick className="h-4 w-4" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{avgClickRate}%</div>
+                    <p className="text-xs text-muted-foreground mt-1">Click Through Rate (CTR)</p>
+                  </CardContent>
+                </Card>
+
+              </div>
+            )}
+
+            {/* Campaign Table */}
+            <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-xl font-bold text-[#3b1a08] dark:text-white">Daftar Kampanye Email Massal</CardTitle>
+                    <CardDescription>Menampilkan log pengiriman dari modul Odoo mass.mailing.</CardDescription>
+                  </div>
+                  <div className="relative max-w-sm w-full">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="Cari subjek kampanye..." 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 bg-background border-border"
+                    />
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-0">
+                {isLoading ? (
+                  <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-3">
+                    <Loader2 className="h-8 w-8 animate-spin text-[#D05A1E]" />
+                    <span>Menarik data email dari Odoo ERP...</span>
+                  </div>
+                ) : filteredMailings.length === 0 ? (
+                  <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-2">
+                    <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
+                    <span className="font-semibold text-[#3b1a08] dark:text-white">Tidak ada kampanye ditemukan</span>
+                    <span className="text-xs">Ubah filter pencarian atau buat kampanye baru.</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left border-collapse">
+                      <thead>
+                        <tr className="bg-muted/40 border-b border-border/50 text-xs font-semibold text-muted-foreground uppercase">
+                          <th className="px-6 py-4">Subjek Kampanye</th>
+                          <th className="px-6 py-4">Induk UTM</th>
+                          <th className="px-6 py-4">Status</th>
+                          <th className="px-6 py-4 text-center">Terkirim</th>
+                          <th className="px-6 py-4 text-center">Rasio Terbuka</th>
+                          <th className="px-6 py-4 text-center">Rasio Klik</th>
+                          <th className="px-6 py-4 text-right">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/30">
+                        {filteredMailings.map(m => {
+                          const openPct = m.sent > 0 ? ((m.opened / m.sent) * 100).toFixed(0) : '0';
+                          const clickPct = m.sent > 0 ? ((m.clicked / m.sent) * 100).toFixed(0) : '0';
+
+                          return (
+                            <tr key={m.id} className="hover:bg-muted/20 transition-colors">
+                              <td className="px-6 py-4 font-bold text-[#3b1a08] dark:text-white max-w-xs truncate">
+                                {m.subject}
+                              </td>
+                              <td className="px-6 py-4 text-xs font-medium text-muted-foreground">
+                                {m.campaignName ? (
+                                  <span className="bg-[#D05A1E]/10 text-[#D05A1E] px-2 py-0.5 rounded-full font-bold">
+                                    {m.campaignName}
+                                  </span>
+                                ) : (
+                                  <span className="italic text-muted-foreground/60">Tidak Terikat</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4">
+                                {m.state === 'done' && (
+                                  <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-full text-xs font-semibold">
+                                    <CheckCircle className="h-3.5 w-3.5" /> Selesai
+                                  </span>
+                                )}
+                                {m.state === 'sending' && (
+                                  <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2.5 py-1 rounded-full text-xs font-semibold animate-pulse">
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Mengirim
+                                  </span>
+                                )}
+                                {m.state === 'in_queue' && (
+                                  <span className="inline-flex items-center gap-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-full text-xs font-semibold">
+                                    <Loader2 className="h-3.5 w-3.5" /> Antrean
+                                  </span>
+                                )}
+                                {m.state === 'draft' && (
+                                  <span className="inline-flex items-center gap-1 bg-slate-500/10 text-slate-600 dark:text-slate-400 px-2.5 py-1 rounded-full text-xs font-semibold">
+                                    <FileText className="h-3.5 w-3.5" /> Draft
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-center font-semibold text-[#3b1a08] dark:text-white">
+                                {m.sent}
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                <div className="flex flex-col items-center gap-1">
+                                  <span className="font-bold text-orange-500">{openPct}%</span>
+                                  <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                                    <div className="h-full bg-orange-500 rounded-full" style={{ width: `${openPct}%` }} />
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                <div className="flex flex-col items-center gap-1">
+                                  <span className="font-bold text-indigo-500">{clickPct}%</span>
+                                  <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                                    <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${clickPct}%` }} />
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <Button 
+                                  onClick={() => {
+                                    setSelectedMailing(m);
+                                    setIsDetailOpen(true);
+                                  }}
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-xs font-semibold text-[#D05A1E] hover:text-[#B34914] hover:bg-[#D05A1E]/10"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5 mr-1" /> Detail
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          /* MAILING LISTS AND CONTACTS TAB */
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            {/* Card 1: Total Campaigns */}
-            <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/5 blur-2xl rounded-full" />
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-semibold text-muted-foreground">Total Kampanye</CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-500 flex items-center justify-center">
-                  <Megaphone className="h-4 w-4" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-[#3b1a08] dark:text-white">{totalCampaigns}</div>
-                <p className="text-xs text-muted-foreground mt-1">Modul Broadcast di Odoo</p>
-              </CardContent>
-            </Card>
+            {/* Left 1/3: Mailing Lists Segment List */}
+            <div className="lg:col-span-1 space-y-6">
+              <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden">
+                <CardHeader className="border-b border-border/20 bg-muted/10 pb-4 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg font-bold text-[#3b1a08] dark:text-white flex items-center gap-1.5">
+                      <Database className="h-5 w-5 text-[#D05A1E]" /> Segmen List
+                    </CardTitle>
+                    <CardDescription className="text-xs">Segmen mailing list aktif di Odoo ERP.</CardDescription>
+                  </div>
+                </CardHeader>
+                
+                <CardContent className="p-0 divide-y divide-border/20">
+                  {isLoading ? (
+                    <div className="p-8 text-center text-muted-foreground flex items-center justify-center gap-2">
+                      <Loader2 className="h-5 w-5 animate-spin text-[#D05A1E]" />
+                      <span className="text-xs">Memuat list Odoo...</span>
+                    </div>
+                  ) : mailingLists.length === 0 ? (
+                    <div className="p-8 text-center text-muted-foreground italic text-xs">
+                      Tidak ada mailing list berlabel VeloCocoa.
+                    </div>
+                  ) : (
+                    mailingLists.map(list => (
+                      <div key={list.id} className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors">
+                        <div>
+                          <span className="block font-bold text-sm text-[#3b1a08] dark:text-white">{list.name}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase font-black tracking-wider bg-slate-500/10 px-1.5 py-0.5 rounded mt-1 inline-block">
+                            ID Odoo: {list.id}
+                          </span>
+                        </div>
+                        <span className="bg-[#D05A1E]/10 text-[#D05A1E] font-extrabold text-xs px-2.5 py-1 rounded-xl">
+                          {list.contactCount} Prospek
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
-            {/* Card 2: Total Sent */}
-            <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 blur-2xl rounded-full" />
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-semibold text-muted-foreground">Email Terkirim</CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
-                  <Send className="h-4 w-4" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-[#3b1a08] dark:text-white">{totalSent}</div>
-                <p className="text-xs text-muted-foreground mt-1">Total Prospek Dihubungi</p>
-              </CardContent>
-            </Card>
+            {/* Right 2/3: Subscriber Contacts Database */}
+            <div className="lg:col-span-2 space-y-6">
+              <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden">
+                <CardHeader className="pb-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-[#3b1a08] dark:text-white flex items-center gap-2">
+                        <Users2 className="h-6 w-6 text-[#D05A1E]" /> Database Pelanggan Mailing List
+                      </CardTitle>
+                      <CardDescription>Menampilkan daftar alamat email prospek yang terdaftar di Odoo mailing.contact.</CardDescription>
+                    </div>
+                    <div className="relative max-w-xs w-full">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        placeholder="Cari prospek atau email..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 bg-background border-border"
+                      />
+                    </div>
+                  </div>
+                </CardHeader>
 
-            {/* Card 3: Open Rate */}
-            <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 blur-2xl rounded-full" />
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-semibold text-muted-foreground">Rata-rata Terbuka</CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 flex items-center justify-center">
-                  <MailOpen className="h-4 w-4" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-[#3b1a08] dark:text-white">{avgOpenRate}%</div>
-                <p className="text-xs text-muted-foreground mt-1">Open Rate Rata-rata</p>
-              </CardContent>
-            </Card>
-
-            {/* Card 4: Click Rate */}
-            <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-2xl rounded-full" />
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-semibold text-muted-foreground">Rata-rata Klik</CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
-                  <MousePointerClick className="h-4 w-4" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-[#3b1a08] dark:text-white">{avgClickRate}%</div>
-                <p className="text-xs text-muted-foreground mt-1">Click Through Rate</p>
-              </CardContent>
-            </Card>
+                <CardContent className="p-0">
+                  {isLoading ? (
+                    <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-3">
+                      <Loader2 className="h-8 w-8 animate-spin text-[#D05A1E]" />
+                      <span>Menarik daftar kontak dari Odoo...</span>
+                    </div>
+                  ) : filteredContacts.length === 0 ? (
+                    <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-2">
+                      <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
+                      <span className="font-semibold text-[#3b1a08] dark:text-white">Tidak ada kontak ditemukan</span>
+                      <span className="text-xs">Ubah kata kunci pencarian atau daftarkan kontak baru.</span>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left border-collapse">
+                        <thead>
+                          <tr className="bg-muted/40 border-b border-border/50 text-xs font-semibold text-muted-foreground uppercase">
+                            <th className="px-6 py-4">Nama Prospek</th>
+                            <th className="px-6 py-4">Alamat Email</th>
+                            <th className="px-6 py-4">Daftar List Aktif (Odoo List IDs)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/30">
+                          {filteredContacts.map(contact => {
+                            return (
+                              <tr key={contact.id} className="hover:bg-muted/20 transition-colors">
+                                <td className="px-6 py-4 font-bold text-[#3b1a08] dark:text-white">
+                                  {contact.name === 'No Name' || !contact.name ? (
+                                    <span className="italic text-muted-foreground/60 font-medium">Pelanggan Anonim</span>
+                                  ) : (
+                                    contact.name
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 font-semibold text-[#D05A1E]">
+                                  {contact.email}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex flex-wrap gap-1">
+                                    {contact.listIds.length === 0 ? (
+                                      <span className="text-[10px] text-muted-foreground/60 italic">Tanpa Segmentasi</span>
+                                    ) : (
+                                      contact.listIds.map(lid => {
+                                        const listObj = mailingLists.find(l => String(l.id) === String(lid));
+                                        return (
+                                          <span key={lid} className="bg-slate-500/10 text-slate-600 dark:text-slate-300 font-bold text-[10px] px-2 py-0.5 rounded">
+                                            {listObj ? listObj.name : `List ${lid}`}
+                                          </span>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
           </div>
         )}
-
-        {/* Database List */}
-        <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden">
-          <CardHeader className="pb-4">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
-                <CardTitle className="text-xl font-bold text-[#3b1a08] dark:text-white">Daftar Kampanye Email Massal</CardTitle>
-                <CardDescription>Menampilkan log pengiriman dari modul Odoo mass.mailing.</CardDescription>
-              </div>
-              
-              {/* Search Bar */}
-              <div className="relative max-w-sm w-full">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Cari subjek kampanye..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 bg-background border-border"
-                />
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-3">
-                <Loader2 className="h-8 w-8 animate-spin text-[#D05A1E]" />
-                <span>Menarik data email dari Odoo ERP...</span>
-              </div>
-            ) : filteredMailings.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-2">
-                <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
-                <span className="font-semibold text-[#3b1a08] dark:text-white">Tidak ada kampanye ditemukan</span>
-                <span className="text-xs">Ubah filter pencarian atau buat kampanye baru.</span>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left border-collapse">
-                  <thead>
-                    <tr className="bg-muted/40 border-b border-border/50 text-xs font-semibold text-muted-foreground uppercase">
-                      <th className="px-6 py-4">Subjek Kampanye</th>
-                      <th className="px-6 py-4">Induk UTM</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4 text-center">Terkirim</th>
-                      <th className="px-6 py-4 text-center">Rasio Terbuka</th>
-                      <th className="px-6 py-4 text-center">Rasio Klik</th>
-                      <th className="px-6 py-4 text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/30">
-                    {filteredMailings.map(m => {
-                      const openPct = m.sent > 0 ? ((m.opened / m.sent) * 100).toFixed(0) : '0';
-                      const clickPct = m.sent > 0 ? ((m.clicked / m.sent) * 100).toFixed(0) : '0';
-
-                      return (
-                        <tr key={m.id} className="hover:bg-muted/20 transition-colors">
-                          <td className="px-6 py-4 font-bold text-[#3b1a08] dark:text-white max-w-xs truncate">
-                            {m.subject}
-                          </td>
-                          <td className="px-6 py-4 text-xs font-medium text-muted-foreground">
-                            {m.campaignName ? (
-                              <span className="bg-[#D05A1E]/10 text-[#D05A1E] px-2 py-0.5 rounded-full font-bold">
-                                {m.campaignName}
-                              </span>
-                            ) : (
-                              <span className="italic text-muted-foreground/60">Tidak Terikat</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
-                            {m.state === 'done' && (
-                              <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-full text-xs font-semibold">
-                                <CheckCircle className="h-3.5 w-3.5" /> Selesai
-                              </span>
-                            )}
-                            {m.state === 'sending' && (
-                              <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2.5 py-1 rounded-full text-xs font-semibold animate-pulse">
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Mengirim
-                              </span>
-                            )}
-                            {m.state === 'in_queue' && (
-                              <span className="inline-flex items-center gap-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-full text-xs font-semibold">
-                                <Loader2 className="h-3.5 w-3.5" /> Antrean
-                              </span>
-                            )}
-                            {m.state === 'draft' && (
-                              <span className="inline-flex items-center gap-1 bg-slate-500/10 text-slate-600 dark:text-slate-400 px-2.5 py-1 rounded-full text-xs font-semibold">
-                                <FileText className="h-3.5 w-3.5" /> Draft
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-center font-semibold text-[#3b1a08] dark:text-white">
-                            {m.sent}
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <div className="flex flex-col items-center gap-1">
-                              <span className="font-bold text-orange-500">{openPct}%</span>
-                              <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-orange-500 rounded-full" style={{ width: `${openPct}%` }} />
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <div className="flex flex-col items-center gap-1">
-                              <span className="font-bold text-indigo-500">{clickPct}%</span>
-                              <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${clickPct}%` }} />
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <Button 
-                              onClick={() => {
-                                setSelectedMailing(m);
-                                setIsDetailOpen(true);
-                              }}
-                              variant="ghost" 
-                              size="sm" 
-                              className="text-xs font-semibold text-[#D05A1E] hover:text-[#B34914] hover:bg-[#D05A1E]/10"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5 mr-1" /> Detail
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Modal: Create Campaign */}
         {isCreateOpen && (
@@ -487,7 +774,7 @@ export default function MarketingPage() {
                   id="utm"
                   value={selectedUtmId}
                   onChange={(e) => setSelectedUtmId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-primary/20 bg-background text-sm focus-visible:ring-primary focus-visible:ring-2 focus-visible:ring-offset-2 outline-none"
+                  className="w-full h-10 px-3 rounded-lg border border-primary/20 bg-background text-sm focus-visible:ring-primary focus-visible:ring-2 focus-visible:ring-offset-2 outline-none font-semibold text-foreground"
                 >
                   <option value="0">--- Tidak Dikaitkan ---</option>
                   {utmCampaigns.map(utm => (
@@ -507,7 +794,7 @@ export default function MarketingPage() {
                   id="template"
                   value={selectedTemplate}
                   onChange={(e) => handleTemplateChange(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-primary/20 bg-background text-sm focus-visible:ring-primary outline-none font-semibold text-primary"
+                  className="w-full h-10 px-3 rounded-lg border border-primary/20 bg-background text-sm focus-visible:ring-primary outline-none font-semibold text-[#D05A1E]"
                 >
                   <option value="CAFE">☕ Template Kemitraan Kafe / Coffee Shop</option>
                   <option value="HOTEL">🏨 Template Pasokan Hotel Supplies / Banquet</option>
@@ -583,7 +870,7 @@ export default function MarketingPage() {
                 </div>
                 <div>
                   <span className="block font-semibold">Kampanye UTM:</span>
-                  <span className="text-primary font-bold text-sm">
+                  <span className="text-[#D05A1E] font-bold text-sm">
                     {selectedMailing.campaignName || "--- Tidak Terikat ---"}
                   </span>
                 </div>
@@ -625,6 +912,159 @@ export default function MarketingPage() {
                 </Button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Modal: Create Mailing List */}
+        {isCreateListOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 p-4">
+            <form 
+              onSubmit={handleCreateListSubmit}
+              className="bg-card w-full max-w-md p-6 rounded-2xl shadow-2xl border border-primary/20 space-y-4 text-left"
+            >
+              <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                <h2 className="text-lg font-bold flex items-center gap-2 text-foreground">
+                  <FolderPlus className="h-5 w-5 text-[#D05A1E]" /> Buat Mailing List Baru
+                </h2>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setIsCreateListOpen(false)}
+                  className="text-muted-foreground hover:bg-muted/10"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="listName" className="text-xs font-semibold">Nama Mailing List</Label>
+                <Input 
+                  id="listName"
+                  placeholder="Contoh: Kemitraan VeloCocoa Cafe Jabodetabek"
+                  value={newListName}
+                  onChange={(e) => setNewListName(e.target.value)}
+                  className="bg-background border-primary/20"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 pt-3 border-t border-border/30">
+                <Button 
+                  type="submit" 
+                  disabled={isListSubmitting}
+                  className="flex-1 bg-[#D05A1E] hover:bg-[#B34914] text-white font-bold"
+                >
+                  {isListSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                      Membuat...
+                    </>
+                  ) : "Buat Mailing List"}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  onClick={() => setIsCreateListOpen(false)}
+                  className="text-muted-foreground hover:bg-muted/10 font-medium"
+                >
+                  Batal
+                </Button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Modal: Add Subscriber Contact */}
+        {isAddContactOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 p-4">
+            <form 
+              onSubmit={handleAddContactSubmit}
+              className="bg-card w-full max-w-md p-6 rounded-2xl shadow-2xl border border-primary/20 space-y-4 text-left"
+            >
+              <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                <h2 className="text-lg font-bold flex items-center gap-2 text-foreground">
+                  <UserPlus className="h-5 w-5 text-[#D05A1E]" /> Daftarkan Kontak Prospek
+                </h2>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setIsAddContactOpen(false)}
+                  className="text-muted-foreground hover:bg-muted/10"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              {/* Name */}
+              <div className="space-y-1.5">
+                <Label htmlFor="contactName" className="text-xs font-semibold">Nama Prospek (Opsional)</Label>
+                <Input 
+                  id="contactName"
+                  placeholder="Contoh: Rian Hidayat"
+                  value={newContactName}
+                  onChange={(e) => setNewContactName(e.target.value)}
+                  className="bg-background border-primary/20"
+                />
+              </div>
+
+              {/* Email */}
+              <div className="space-y-1.5">
+                <Label htmlFor="contactEmail" className="text-xs font-semibold">Alamat Email Prospek</Label>
+                <Input 
+                  id="contactEmail"
+                  type="email"
+                  placeholder="Contoh: rian.hidayat@gmail.com"
+                  value={newContactEmail}
+                  onChange={(e) => setNewContactEmail(e.target.value)}
+                  className="bg-background border-primary/20"
+                  required
+                />
+              </div>
+
+              {/* Select List */}
+              <div className="space-y-1.5">
+                <Label htmlFor="contactList" className="text-xs font-semibold">Masukkan ke Mailing List</Label>
+                <select 
+                  id="contactList"
+                  value={selectedListId}
+                  onChange={(e) => setSelectedListId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-primary/20 bg-background text-sm focus-visible:ring-primary focus-visible:ring-2 focus-visible:ring-offset-2 outline-none font-semibold text-foreground"
+                  required
+                >
+                  <option value="0">--- Pilih Target List ---</option>
+                  {mailingLists.map(list => (
+                    <option key={list.id} value={list.id}>
+                      {list.name} ({list.contactCount} Kontak)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-3 border-t border-border/30">
+                <Button 
+                  type="submit" 
+                  disabled={isContactSubmitting}
+                  className="flex-1 bg-[#D05A1E] hover:bg-[#B34914] text-white font-bold"
+                >
+                  {isContactSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                      Mendaftarkan...
+                    </>
+                  ) : "Daftarkan Kontak"}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  onClick={() => setIsAddContactOpen(false)}
+                  className="text-muted-foreground hover:bg-muted/10 font-medium"
+                >
+                  Batal
+                </Button>
+              </div>
+            </form>
           </div>
         )}
 
