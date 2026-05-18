@@ -970,7 +970,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
             <form 
               onSubmit={handleSubmitCustomLog}
-              className="bg-card w-full max-w-lg p-6 rounded-2xl shadow-2xl border border-primary/20 space-y-4 animate-in zoom-in-95 duration-200 text-left relative overflow-hidden"
+              className="bg-card w-full max-w-lg p-6 rounded-2xl shadow-2xl border border-primary/20 space-y-4 animate-in zoom-in-95 duration-200 text-left relative max-h-[90vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between border-b border-border/30 pb-3">
                 <h2 className="text-lg font-bold flex items-center gap-2 text-foreground">
