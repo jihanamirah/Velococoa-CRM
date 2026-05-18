@@ -14,7 +14,8 @@ import {
   PlusCircle,
   Package,
   ArrowUpRight,
-  Megaphone
+  Megaphone,
+  Wallet
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,7 @@ const navItems = [
   { icon: Kanban, label: 'Pipeline Kanban', href: '/kanban' },
   { icon: PlusCircle, label: 'Tambah Lead', href: '/leads/new' },
   { icon: Megaphone, label: 'Marketing Portal', href: '/marketing' },
+  { icon: Wallet, label: 'Accounting Portal', href: '/accounting' },
 ];
 
 export function CRMLayout({ children }: { children: React.ReactNode }) {

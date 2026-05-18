@@ -314,3 +314,43 @@ export async function getOdooUtmCampaigns() {
   }
 }
 
+export async function getOdooInvoices() {
+  try {
+    const rawXml = await execute('account.move', 'search_read', [[
+      ['move_type', '=', 'out_invoice']
+    ]], {
+      fields: ['id', 'name', 'state', 'payment_state', 'invoice_date', 'invoice_date_due', 'amount_total', 'partner_id'],
+      limit: 100,
+      order: 'id desc'
+    });
+    return parseOdooRecords(rawXml);
+  } catch (error) {
+    console.error('getOdooInvoices failed:', error);
+    return [];
+  }
+}
+
+export async function createOdooInvoice(partnerId: number, amountTotal: number, invoiceDate: string, invoiceDateDue: string, note: string) {
+  try {
+    const params: any = {
+      move_type: 'out_invoice',
+      partner_id: partnerId,
+      invoice_date: invoiceDate,
+      invoice_date_due: invoiceDateDue,
+      narration: note,
+      invoice_line_ids: [[0, 0, {
+        name: note || 'Pasokan Cokelat Premium VeloCocoa',
+        price_unit: amountTotal,
+        quantity: 1
+      }]]
+    };
+
+    const newInvoiceId = await execute('account.move', 'create', [params]);
+    return { success: true, data: newInvoiceId };
+  } catch (error: any) {
+    console.error('createOdooInvoice failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+

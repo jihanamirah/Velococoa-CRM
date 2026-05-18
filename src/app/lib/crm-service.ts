@@ -18,7 +18,9 @@ import {
   getOdooContacts,
   getOdooMailings,
   createOdooMailing,
-  getOdooUtmCampaigns
+  getOdooUtmCampaigns,
+  getOdooInvoices,
+  createOdooInvoice
 } from '@/services/odoo';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -438,3 +440,28 @@ export async function getUtmCampaigns() {
     title: String(c.title || c.name || '')
   }));
 }
+
+export async function getInvoices() {
+  const invoices = await getOdooInvoices();
+  return invoices.map(inv => {
+    const partnerName = Array.isArray(inv.partner_id) ? String(inv.partner_id[1]) : 'Mitra Umum';
+    const partnerId = Array.isArray(inv.partner_id) ? Number(inv.partner_id[0]) : 0;
+    
+    return {
+      id: String(inv.id || ''),
+      name: String(inv.name || 'INV/DRAFT'),
+      state: String(inv.state || 'draft'),
+      paymentState: String(inv.payment_state || 'not_paid'),
+      invoiceDate: String(inv.invoice_date || ''),
+      invoiceDateDue: String(inv.invoice_date_due || ''),
+      amountTotal: Number(inv.amount_total || 0),
+      partnerId: partnerId,
+      partnerName: partnerName
+    };
+  });
+}
+
+export async function createInvoice(partnerId: number, amountTotal: number, invoiceDate: string, invoiceDateDue: string, note: string) {
+  return await createOdooInvoice(partnerId, amountTotal, invoiceDate, invoiceDateDue, note);
+}
+
