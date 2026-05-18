@@ -10,7 +10,12 @@ import {
   updateOdooLeadStage, 
   setOdooLeadWon, 
   setOdooLeadLost,
-  updateOdooLeadDetails
+  updateOdooLeadDetails,
+  getOdooChatterMessages,
+  postOdooChatterMessage,
+  getOdooActivities,
+  scheduleOdooActivity,
+  getOdooContacts
 } from '@/services/odoo';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -333,4 +338,66 @@ export async function updateLeadDetails(leadId: string, updates: Partial<Lead>):
   }
 
   return await getLeadById(leadId);
+}
+
+export async function getCommunicationLogs(leadId: string) {
+  const idInt = parseInt(leadId, 10);
+  const messages = await getOdooChatterMessages(idInt);
+  return messages.map(m => {
+    // Determine activity label based on message_type and content
+    let type = 'NOTE';
+    const bodyText = m.body ? String(m.body).toLowerCase() : '';
+    if (bodyText.includes('whatsapp') || bodyText.includes('wa.me')) type = 'WHATSAPP';
+    else if (bodyText.includes('call') || bodyText.includes('telepon') || bodyText.includes('panggilan')) type = 'CALL';
+    else if (m.message_type === 'email' || bodyText.includes('email') || bodyText.includes('mailto')) type = 'EMAIL';
+    else if (bodyText.includes('meeting') || bodyText.includes('rapat') || bodyText.includes('jadwal')) type = 'MEETING';
+
+    return {
+      id: String(m.id || Math.random()),
+      date: String(m.date || new Date().toISOString()),
+      body: String(m.body || '').replace(/<[^>]*>/g, '').trim(), // Strip HTML
+      type: type as 'EMAIL' | 'CALL' | 'WHATSAPP' | 'MEETING' | 'NOTE'
+    };
+  });
+}
+
+export async function addCommunicationLog(leadId: string, body: string) {
+  const idInt = parseInt(leadId, 10);
+  return await postOdooChatterMessage(idInt, body);
+}
+
+export async function getScheduledActivities(leadId: string) {
+  const idInt = parseInt(leadId, 10);
+  const activities = await getOdooActivities(idInt);
+  return activities.map(act => {
+    const typeName = Array.isArray(act.activity_type_id) ? String(act.activity_type_id[1]) : 'Activity';
+    return {
+      id: String(act.id || Math.random()),
+      summary: String(act.summary || 'Aktivitas Terjadwal'),
+      note: String(act.note || '').replace(/<[^>]*>/g, '').trim(),
+      deadline: String(act.date_deadline || ''),
+      createDate: String(act.create_date || ''),
+      type: typeName.toUpperCase() as 'MEETING' | 'EMAIL' | 'CALL' | 'TO-DO'
+    };
+  });
+}
+
+export async function createScheduledActivity(
+  leadId: string, 
+  activityTypeId: number, 
+  summary: string, 
+  note: string, 
+  deadline: string
+) {
+  const idInt = parseInt(leadId, 10);
+  return await scheduleOdooActivity(idInt, activityTypeId, summary, note, deadline);
+}
+
+export async function getContacts() {
+  const partners = await getOdooContacts();
+  return partners.map(p => ({
+    id: String(p.id || ''),
+    name: String(p.name || 'Kontak Tanpa Nama'),
+    email: String(p.email || '')
+  }));
 }

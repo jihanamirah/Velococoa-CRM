@@ -188,3 +188,81 @@ export async function updateOdooLeadDetails(leadId: number, data: any) {
     return { success: false, error: error.message };
   }
 }
+
+export async function getOdooChatterMessages(leadId: number) {
+  try {
+    const rawXml = await execute('mail.message', 'search_read', [[
+      ['model', '=', 'crm.lead'],
+      ['res_id', '=', leadId]
+    ]], {
+      fields: ['id', 'date', 'body', 'message_type', 'subtype_id'],
+      order: 'date desc'
+    });
+    return parseOdooRecords(rawXml);
+  } catch (error) {
+    console.error('getOdooChatterMessages failed:', error);
+    return [];
+  }
+}
+
+export async function postOdooChatterMessage(leadId: number, body: string, messageType: string = 'comment') {
+  try {
+    await execute('crm.lead', 'message_post', [[leadId]], {
+      body: body,
+      message_type: messageType,
+      subtype_xmlid: 'mail.mt_comment'
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getOdooActivities(leadId: number) {
+  try {
+    const rawXml = await execute('mail.activity', 'search_read', [[
+      ['res_model', '=', 'crm.lead'],
+      ['res_id', '=', leadId]
+    ]], {
+      fields: ['id', 'activity_type_id', 'summary', 'note', 'date_deadline', 'create_date'],
+      order: 'date_deadline asc'
+    });
+    return parseOdooRecords(rawXml);
+  } catch (error) {
+    console.error('getOdooActivities failed:', error);
+    return [];
+  }
+}
+
+export async function scheduleOdooActivity(leadId: number, activityTypeId: number, summary: string, note: string, dateDeadline: string) {
+  try {
+    await execute('mail.activity', 'create', [{
+      res_model_id: 728, // ID of 'crm.lead' model in ir.model
+      res_model: 'crm.lead',
+      res_id: leadId,
+      activity_type_id: activityTypeId,
+      summary: summary,
+      note: note,
+      date_deadline: dateDeadline
+    }]);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getOdooContacts() {
+  try {
+    const rawXml = await execute('res.partner', 'search_read', [[
+      ['active', '=', true]
+    ]], {
+      fields: ['id', 'name', 'email'],
+      limit: 150,
+      order: 'name asc'
+    });
+    return parseOdooRecords(rawXml);
+  } catch (error) {
+    console.error('getOdooContacts failed:', error);
+    return [];
+  }
+}
