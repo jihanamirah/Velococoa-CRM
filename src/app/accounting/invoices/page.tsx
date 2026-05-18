@@ -73,6 +73,7 @@ export default function InvoicesPage() {
   const [payDate, setPayDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [payJournalType, setPayJournalType] = useState<'bank' | 'cash'>('bank');
   const [postingInvoiceId, setPostingInvoiceId] = useState<string | null>(null);
+  const [payType, setPayType] = useState<'lunas' | 'cicilan'>('lunas');
   
   // Form states
   const [selectedPartnerId, setSelectedPartnerId] = useState('0');
@@ -93,6 +94,7 @@ export default function InvoicesPage() {
     setPayAmount(String(inv.amountTotal));
     setPayDate(new Date().toISOString().split('T')[0]);
     setPayJournalType('bank');
+    setPayType('lunas');
     setIsPayOpen(true);
   };
 
@@ -611,6 +613,28 @@ export default function InvoicesPage() {
                 <div className="text-xs font-bold uppercase tracking-wider">Membayar Invoice</div>
                 <div className="text-sm font-black">{activeInvoice.name}</div>
                 <div className="text-xs font-medium text-emerald-800/80 dark:text-emerald-400/80">Customer: {activeInvoice.partnerName}</div>
+                <div className="text-xs font-bold text-indigo-700 dark:text-indigo-300">Total Tagihan: {formatRupiah(activeInvoice.amountTotal)}</div>
+              </div>
+
+              {/* Payment Type Selection */}
+              <div className="space-y-1.5">
+                <Label htmlFor="payTypeSelect" className="text-xs font-semibold">Tipe Pembayaran</Label>
+                <select 
+                  id="payTypeSelect"
+                  value={payType}
+                  onChange={(e) => {
+                    const selected = e.target.value as 'lunas' | 'cicilan';
+                    setPayType(selected);
+                    if (selected === 'lunas') {
+                      setPayAmount(String(activeInvoice.amountTotal));
+                    }
+                  }}
+                  className="w-full h-10 px-3 rounded-lg border border-primary/20 bg-background text-sm focus-visible:ring-emerald-500 focus-visible:ring-2 focus-visible:ring-offset-2 outline-none font-semibold text-foreground"
+                  required
+                >
+                  <option value="lunas">Lunas (Bayar Penuh)</option>
+                  <option value="cicilan">Cicilan (Bayar Sebagian)</option>
+                </select>
               </div>
 
               {/* Payment Method */}
@@ -643,21 +667,30 @@ export default function InvoicesPage() {
 
               {/* Payment Amount */}
               <div className="space-y-1.5">
-                <Label htmlFor="payAmount" className="text-xs font-semibold">Jumlah Pembayaran (IDR)</Label>
+                <div className="flex justify-between items-center">
+                  <Label htmlFor="payAmount" className="text-xs font-semibold">Jumlah Pembayaran (IDR)</Label>
+                  {payType === 'lunas' && (
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold px-1.5 py-0.5 rounded">Otomatis Terkunci Lunas</span>
+                  )}
+                </div>
                 <Input 
                   id="payAmount"
                   type="number"
-                  placeholder="Jumlah bayar"
+                  placeholder="Masukkan nominal bayar"
                   value={payAmount}
+                  disabled={payType === 'lunas'}
                   onChange={(e) => setPayAmount(e.target.value)}
-                  className="bg-background border-primary/20 font-bold text-emerald-600 dark:text-emerald-400"
+                  className="bg-background border-primary/20 font-bold text-emerald-600 dark:text-emerald-400 disabled:opacity-80 disabled:cursor-not-allowed"
                   required
                 />
+                {payType === 'cicilan' && (
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Masukkan nominal cicilan yang lebih kecil dari total tagihan.</p>
+                )}
               </div>
 
               {/* Info alert */}
               <div className="p-3 bg-slate-500/10 border border-slate-500/20 rounded-xl text-xs text-muted-foreground leading-relaxed">
-                Pencatatan pembayaran ini akan otomatis membuat entri jurnal pembayaran baru di Odoo ERP dan merekonsiliasikannya ke invoice, sehingga status tagihan menjadi <b>Lunas</b> secara realtime.
+                Pencatatan pembayaran ini akan otomatis membuat entri jurnal pembayaran baru di Odoo ERP dan merekonsiliasikannya ke invoice, sehingga status tagihan menjadi <b>{payType === 'lunas' ? "Lunas" : "Sebagian"}</b> secara realtime.
               </div>
 
               {/* Action Buttons */}
@@ -672,7 +705,7 @@ export default function InvoicesPage() {
                       <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
                       Membayar...
                     </>
-                  ) : "Konfirmasi Pembayaran Lunas"}
+                  ) : payType === 'lunas' ? "Konfirmasi Pembayaran Lunas" : "Konfirmasi Pembayaran Cicilan"}
                 </Button>
                 <Button 
                   type="button" 
