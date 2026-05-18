@@ -266,3 +266,51 @@ export async function getOdooContacts() {
     return [];
   }
 }
+
+export async function getOdooMailings() {
+  try {
+    const rawXml = await execute('mailing.mailing', 'search_read', [[]], {
+      fields: ['id', 'subject', 'state', 'sent', 'delivered', 'opened', 'clicked', 'body_html', 'campaign_id'],
+      limit: 100,
+      order: 'id desc'
+    });
+    return parseOdooRecords(rawXml);
+  } catch (error) {
+    console.error('getOdooMailings failed:', error);
+    return [];
+  }
+}
+
+export async function createOdooMailing(subject: string, campaignId: number, bodyHtml: string) {
+  try {
+    const params: any = {
+      subject: subject,
+      body_html: bodyHtml,
+      state: 'draft',
+      mailing_type: 'mail'
+    };
+    if (campaignId > 0) {
+      params.campaign_id = campaignId;
+    }
+    const rawXml = await execute('mailing.mailing', 'create', [params]);
+    return { success: true, data: rawXml };
+  } catch (error: any) {
+    console.error('createOdooMailing failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getOdooUtmCampaigns() {
+  try {
+    const rawXml = await execute('utm.campaign', 'search_read', [[]], {
+      fields: ['id', 'name', 'title'],
+      limit: 100,
+      order: 'name asc'
+    });
+    return parseOdooRecords(rawXml);
+  } catch (error) {
+    console.error('getOdooUtmCampaigns failed:', error);
+    return [];
+  }
+}
+

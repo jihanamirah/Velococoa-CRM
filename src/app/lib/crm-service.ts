@@ -15,7 +15,10 @@ import {
   postOdooChatterMessage,
   getOdooActivities,
   scheduleOdooActivity,
-  getOdooContacts
+  getOdooContacts,
+  getOdooMailings,
+  createOdooMailing,
+  getOdooUtmCampaigns
 } from '@/services/odoo';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -399,5 +402,39 @@ export async function getContacts() {
     id: String(p.id || ''),
     name: String(p.name || 'Kontak Tanpa Nama'),
     email: String(p.email || '')
+  }));
+}
+
+export async function getMailings() {
+  const mailings = await getOdooMailings();
+  return mailings.map(m => {
+    const campaignName = Array.isArray(m.campaign_id) ? String(m.campaign_id[1]) : '';
+    const campaignId = Array.isArray(m.campaign_id) ? Number(m.campaign_id[0]) : 0;
+    
+    return {
+      id: String(m.id || ''),
+      subject: String(m.subject || 'Tanpa Subjek'),
+      state: String(m.state || 'draft'),
+      sent: Number(m.sent || 0),
+      delivered: Number(m.delivered || 0),
+      opened: Number(m.opened || 0),
+      clicked: Number(m.clicked || 0),
+      bodyHtml: String(m.body_html || ''),
+      campaignId: campaignId,
+      campaignName: campaignName
+    };
+  });
+}
+
+export async function createMailing(subject: string, campaignId: number, bodyHtml: string) {
+  return await createOdooMailing(subject, campaignId, bodyHtml);
+}
+
+export async function getUtmCampaigns() {
+  const campaigns = await getOdooUtmCampaigns();
+  return campaigns.map(c => ({
+    id: String(c.id || ''),
+    name: String(c.name || ''),
+    title: String(c.title || c.name || '')
   }));
 }
