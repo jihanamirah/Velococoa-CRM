@@ -17,7 +17,9 @@ import {
   Megaphone,
   Wallet,
   LayoutGrid,
-  Send
+  Send,
+  Target,
+  MailOpen
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -66,7 +68,8 @@ export function CRMLayout({ children }: { children: React.ReactNode }) {
   if (isMarketing) {
     activeNavItems = [
       { icon: Megaphone, label: 'Marketing Dashboard', href: '/marketing' },
-      { icon: Send, label: 'Kampanye Email', href: '/marketing/campaigns' },
+      { icon: Target, label: 'Kampanye Pemasaran', href: '/marketing/campaigns' },
+      { icon: MailOpen, label: 'Mailing Broadcast', href: '/marketing/mailings' },
       { icon: Users, label: 'Mailing List & Kontak', href: '/marketing/lists' },
       { icon: LayoutGrid, label: 'Ganti Portal ERP', href: '/login' },
     ];

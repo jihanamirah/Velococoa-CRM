@@ -420,5 +420,20 @@ export async function createOdooMailingContact(name: string, email: string, list
   }
 }
 
+export async function createOdooUtmCampaign(title: string, name: string) {
+  try {
+    const params = {
+      title,
+      name
+    };
+    const newUtmId = await execute('utm.campaign', 'create', [params]);
+    return { success: true, data: newUtmId };
+  } catch (error: any) {
+    console.error('createOdooUtmCampaign failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+
 
 
