@@ -15,7 +15,8 @@ import {
   Package,
   ArrowUpRight,
   Megaphone,
-  Wallet
+  Wallet,
+  LayoutGrid
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +51,30 @@ export function CRMLayout({ children }: { children: React.ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const initialLoadRef = useRef(true);
   const cacheRef = useRef<Record<string, string>>({}); // Maps leadId -> status
+
+  const isMarketing = pathname.startsWith('/marketing');
+  const isAccounting = pathname.startsWith('/accounting');
+  
+  let activeNavItems = [
+    { icon: LayoutDashboard, label: 'CRM Dashboard', href: '/dashboard' },
+    { icon: Users, label: 'Daftar Leads', href: '/leads' },
+    { icon: Kanban, label: 'Pipeline Kanban', href: '/kanban' },
+    { icon: PlusCircle, label: 'Tambah Lead', href: '/leads/new' },
+  ];
+
+  if (isMarketing) {
+    activeNavItems = [
+      { icon: Megaphone, label: 'Marketing Dashboard', href: '/marketing' },
+      { icon: LayoutGrid, label: 'Ganti Portal ERP', href: '/login' },
+    ];
+  } else if (isAccounting) {
+    activeNavItems = [
+      { icon: Wallet, label: 'Accounting Dashboard', href: '/accounting' },
+      { icon: LayoutGrid, label: 'Ganti Portal ERP', href: '/login' },
+    ];
+  } else {
+    activeNavItems.push({ icon: LayoutGrid, label: 'Ganti Portal ERP', href: '/login' });
+  }
 
   useEffect(() => {
     let intervalId: any;
@@ -154,7 +179,7 @@ export function CRMLayout({ children }: { children: React.ReactNode }) {
           </SidebarHeader>
           <SidebarContent className="p-2">
             <SidebarMenu>
-              {navItems.map((item) => (
+              {activeNavItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton 
                     asChild 

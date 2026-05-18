@@ -353,4 +353,21 @@ export async function createOdooInvoice(partnerId: number, amountTotal: number, 
   }
 }
 
+export async function getOdooJournalEntries() {
+  try {
+    const rawXml = await execute('account.move', 'search_read', [[
+      ['move_type', '=', 'entry']
+    ]], {
+      fields: ['id', 'name', 'ref', 'date', 'amount_total', 'state'],
+      limit: 100,
+      order: 'id desc'
+    });
+    return parseOdooRecords(rawXml);
+  } catch (error) {
+    console.error('getOdooJournalEntries failed:', error);
+    return [];
+  }
+}
+
+
 

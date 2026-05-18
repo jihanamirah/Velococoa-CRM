@@ -20,7 +20,8 @@ import {
   createOdooMailing,
   getOdooUtmCampaigns,
   getOdooInvoices,
-  createOdooInvoice
+  createOdooInvoice,
+  getOdooJournalEntries
 } from '@/services/odoo';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -463,5 +464,19 @@ export async function getInvoices() {
 
 export async function createInvoice(partnerId: number, amountTotal: number, invoiceDate: string, invoiceDateDue: string, note: string) {
   return await createOdooInvoice(partnerId, amountTotal, invoiceDate, invoiceDateDue, note);
+}
+
+export async function getJournalEntries() {
+  const raw = await getOdooJournalEntries();
+  return raw.map((entry: any) => {
+    return {
+      id: String(entry.id || ''),
+      name: String(entry.name || ''),
+      ref: String(entry.ref || ''),
+      date: String(entry.date || ''),
+      amountTotal: Number(entry.amount_total || 0),
+      state: String(entry.state || 'draft')
+    };
+  });
 }
 

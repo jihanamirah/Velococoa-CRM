@@ -83,8 +83,32 @@ export default function MarketingPage() {
         getMailings(),
         getUtmCampaigns()
       ]);
-      setMailings(fetchedMailings);
-      setUtmCampaigns(fetchedUtms);
+      
+      // Filter specifically for PT VeloCocoa relevant marketing data
+      const velococoaMailings = fetchedMailings.filter(m => {
+        const text = (m.subject + ' ' + m.campaignName + ' ' + m.bodyHtml).toLowerCase();
+        return text.includes('velococoa') || 
+               text.includes('mitra') || 
+               text.includes('ethicocoa') || 
+               text.includes('chocora') || 
+               text.includes('ramadan') || 
+               text.includes('cokelat') || 
+               text.includes('cafe') || 
+               text.includes('bakery') || 
+               text.includes('hotel');
+      });
+
+      const velococoaUtms = fetchedUtms.filter(u => {
+        const text = (u.title + ' ' + u.name).toLowerCase();
+        return text.includes('velococoa') || 
+               text.includes('mitra') || 
+               text.includes('ethicocoa') || 
+               text.includes('chocora') || 
+               text.includes('campaign');
+      });
+
+      setMailings(velococoaMailings);
+      setUtmCampaigns(velococoaUtms);
     } catch (error) {
       console.error("Failed to load marketing data:", error);
     } finally {
