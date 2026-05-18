@@ -26,7 +26,8 @@ import {
   createOdooMailingList,
   getOdooMailingContacts,
   createOdooMailingContact,
-  createOdooUtmCampaign
+  createOdooUtmCampaign,
+  getOdooProducts
 } from '@/services/odoo';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -467,8 +468,36 @@ export async function getInvoices() {
   });
 }
 
-export async function createInvoice(partnerId: number, amountTotal: number, invoiceDate: string, invoiceDateDue: string, note: string) {
-  return await createOdooInvoice(partnerId, amountTotal, invoiceDate, invoiceDateDue, note);
+export async function createInvoice(
+  partnerId: number, 
+  amountTotal: number, 
+  invoiceDate: string, 
+  invoiceDateDue: string, 
+  note: string,
+  productId?: number,
+  quantity?: number,
+  confirmAndPost?: boolean
+) {
+  return await createOdooInvoice(
+    partnerId, 
+    amountTotal, 
+    invoiceDate, 
+    invoiceDateDue, 
+    note,
+    productId,
+    quantity,
+    confirmAndPost
+  );
+}
+
+export async function getProducts() {
+  const rawProducts = await getOdooProducts();
+  return rawProducts.map((p: any) => ({
+    id: String(p.id || ''),
+    name: String(p.name || ''),
+    price: parseFloat(p.lst_price || '0'),
+    sku: String(p.default_code || '')
+  }));
 }
 
 export async function getJournalEntries() {

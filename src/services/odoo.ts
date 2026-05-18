@@ -330,26 +330,64 @@ export async function getOdooInvoices() {
   }
 }
 
-export async function createOdooInvoice(partnerId: number, amountTotal: number, invoiceDate: string, invoiceDateDue: string, note: string) {
+export async function createOdooInvoice(
+  partnerId: number, 
+  amountTotal: number, 
+  invoiceDate: string, 
+  invoiceDateDue: string, 
+  note: string,
+  productId?: number,
+  quantity?: number,
+  confirmAndPost?: boolean
+) {
   try {
     const params: any = {
       move_type: 'out_invoice',
       partner_id: partnerId,
       invoice_date: invoiceDate,
       invoice_date_due: invoiceDateDue,
-      narration: note,
-      invoice_line_ids: [[0, 0, {
+      narration: note
+    };
+
+    if (productId && quantity) {
+      params.invoice_line_ids = [[0, 0, {
+        product_id: productId,
+        name: note || 'Pasokan Cokelat Premium VeloCocoa',
+        price_unit: amountTotal / quantity,
+        quantity: quantity
+      }]];
+    } else {
+      params.invoice_line_ids = [[0, 0, {
         name: note || 'Pasokan Cokelat Premium VeloCocoa',
         price_unit: amountTotal,
         quantity: 1
       }]]
-    };
+    }
 
     const newInvoiceId = await execute('account.move', 'create', [params]);
+    
+    if (confirmAndPost) {
+      // Auto confirm/post draft invoice in Odoo
+      await execute('account.move', 'action_post', [[newInvoiceId]]);
+    }
+
     return { success: true, data: newInvoiceId };
   } catch (error: any) {
     console.error('createOdooInvoice failed:', error);
     return { success: false, error: error.message };
+  }
+}
+
+export async function getOdooProducts() {
+  try {
+    const rawXml = await execute('product.product', 'search_read', [
+      [['sale_ok', '=', true]], // Fetch only sellable products
+      ['id', 'name', 'lst_price', 'default_code']
+    ]);
+    return parseOdooRecords(rawXml);
+  } catch (error) {
+    console.error('getOdooProducts failed:', error);
+    return [];
   }
 }
 

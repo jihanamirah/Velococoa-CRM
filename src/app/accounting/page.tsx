@@ -11,7 +11,8 @@ import {
   getInvoices, 
   createInvoice, 
   getContacts,
-  getJournalEntries
+  getJournalEntries,
+  getProducts
 } from "@/app/lib/crm-service";
 import { 
   Wallet, 
@@ -57,10 +58,18 @@ interface OdooContact {
   email: string;
 }
 
+interface OdooProduct {
+  id: string;
+  name: string;
+  price: number;
+  sku: string;
+}
+
 export default function AccountingPage() {
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [journalEntries, setJournalEntries] = useState<JournalEntryRecord[]>([]);
   const [contacts, setContacts] = useState<OdooContact[]>([]);
+  const [products, setProducts] = useState<OdooProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'invoices' | 'journals'>('invoices');
@@ -71,6 +80,9 @@ export default function AccountingPage() {
   
   // Form states
   const [selectedPartnerId, setSelectedPartnerId] = useState('0');
+  const [selectedProductId, setSelectedProductId] = useState('0');
+  const [quantity, setQuantity] = useState('1');
+  const [confirmAndPost, setConfirmAndPost] = useState(false);
   const [newAmount, setNewAmount] = useState('');
   const [newInvoiceDate, setNewInvoiceDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [newDueDate, setNewDueDate] = useState(() => {
@@ -107,10 +119,11 @@ export default function AccountingPage() {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const [fetchedInvoices, fetchedContacts, fetchedJournals] = await Promise.all([
+      const [fetchedInvoices, fetchedContacts, fetchedJournals, fetchedProducts] = await Promise.all([
         getInvoices(),
         getContacts(),
-        getJournalEntries()
+        getJournalEntries(),
+        getProducts()
       ]);
 
       // Filter specifically for PT VeloCocoa relevant invoices
@@ -140,12 +153,23 @@ export default function AccountingPage() {
       setInvoices(velococoaInvoices);
       setContacts(velococoaContacts);
       setJournalEntries(velococoaJournals);
+      setProducts(fetchedProducts);
     } catch (error) {
       console.error("Failed to load accounting data:", error);
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (selectedProductId !== '0') {
+      const prod = products.find(p => p.id === selectedProductId);
+      if (prod) {
+        const calculatedAmount = prod.price * parseFloat(quantity || '0');
+        setNewAmount(String(calculatedAmount));
+      }
+    }
+  }, [selectedProductId, quantity, products]);
 
   useEffect(() => {
     loadData();
@@ -162,12 +186,18 @@ export default function AccountingPage() {
         parseFloat(newAmount),
         newInvoiceDate,
         newDueDate,
-        newNote
+        newNote,
+        selectedProductId !== '0' ? parseInt(selectedProductId, 10) : undefined,
+        parseFloat(quantity || '1'),
+        confirmAndPost
       );
       
       if (res.success) {
         setIsCreateOpen(false);
         setSelectedPartnerId('0');
+        setSelectedProductId('0');
+        setQuantity('1');
+        setConfirmAndPost(false);
         setNewAmount('');
         setNewNote('');
         loadData();
@@ -527,6 +557,40 @@ export default function AccountingPage() {
                 </select>
               </div>
 
+              {/* Product & Quantity (Volume) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="product" className="text-xs font-semibold">Pilih Produk Odoo (VeloCocoa Catalog)</Label>
+                  <select 
+                    id="product"
+                    value={selectedProductId}
+                    onChange={(e) => setSelectedProductId(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg border border-primary/20 bg-background text-sm focus-visible:ring-indigo-600 focus-visible:ring-2 focus-visible:ring-offset-2 outline-none font-medium text-foreground"
+                  >
+                    <option value="0">--- Input Manual / Lainnya ---</option>
+                    {products.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({formatRupiah(p.price)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="quantity" className="text-xs font-semibold">Volume Pembelian (Kuantitas)</Label>
+                  <Input 
+                    id="quantity"
+                    type="number"
+                    min="1"
+                    step="any"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    className="bg-background border-primary/20"
+                    placeholder="Contoh: 10"
+                  />
+                </div>
+              </div>
+
               {/* Amount */}
               <div className="space-y-1.5">
                 <Label htmlFor="amount" className="text-xs font-semibold">Total Nilai Tagihan (IDR)</Label>
@@ -536,7 +600,7 @@ export default function AccountingPage() {
                   placeholder="Contoh: 5000000 (untuk Rp 5.000.000)"
                   value={newAmount}
                   onChange={(e) => setNewAmount(e.target.value)}
-                  className="bg-background border-primary/20"
+                  className="bg-background border-primary/20 font-bold text-indigo-600 dark:text-indigo-400"
                   required
                 />
               </div>
@@ -575,14 +639,28 @@ export default function AccountingPage() {
                   placeholder="Contoh: Pembelian Cokelat Couverture Buttons 100kg & Toppings untuk Cafe Harmoni"
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
-                  className="bg-background border-primary/20 text-sm"
+                  className="bg-background border-primary/20 text-sm font-medium"
                   required
                 />
               </div>
 
+              {/* Auto Confirm & Post option */}
+              <div className="flex items-center space-x-2 p-3 bg-indigo-50/50 dark:bg-slate-900/30 rounded-xl border border-indigo-100 dark:border-slate-800">
+                <input 
+                  type="checkbox" 
+                  id="confirmAndPost"
+                  checked={confirmAndPost}
+                  onChange={(e) => setConfirmAndPost(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                />
+                <label htmlFor="confirmAndPost" className="text-xs font-bold cursor-pointer text-indigo-950 dark:text-slate-200">
+                  Konfirmasi & Posting Resmi (Ubah status Draft menjadi Diposting secara realtime di Odoo)
+                </label>
+              </div>
+
               {/* Info alert */}
               <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-xs text-indigo-600 dark:text-indigo-400 leading-relaxed">
-                Submit invoice akan otomatis membuat faktur <b>Draft</b> baru di Odoo ERP lengkap dengan baris invoice yang dikalkulasi pajaknya secara instan.
+                Submit invoice akan otomatis membuat faktur <b>{confirmAndPost ? "Diposting (Resmi)" : "Draft"}</b> baru di Odoo ERP lengkap dengan baris produk dan kuantitas volume yang dikalkulasi pajaknya secara instan.
               </div>
 
               {/* Action Buttons */}
@@ -595,9 +673,9 @@ export default function AccountingPage() {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-                      Membuat di Odoo...
+                      Memproses di Odoo...
                     </>
-                  ) : "Buat Faktur Draft"}
+                  ) : confirmAndPost ? "Posting Resmi & Konfirmasi" : "Buat Faktur Draft"}
                 </Button>
                 <Button 
                   type="button" 
