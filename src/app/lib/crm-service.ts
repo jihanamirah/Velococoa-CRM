@@ -28,7 +28,8 @@ import {
   createOdooMailingContact,
   createOdooUtmCampaign,
   getOdooProducts,
-  payOdooInvoice
+  payOdooInvoice,
+  postOdooInvoice
 } from '@/services/odoo';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -561,6 +562,10 @@ export async function createUtmCampaign(title: string, name: string) {
 
 export async function payInvoice(invoiceId: number, amount: number, paymentDate: string, journalType: 'bank' | 'cash') {
   return await payOdooInvoice(invoiceId, amount, paymentDate, journalType);
+}
+
+export async function postInvoice(invoiceId: number) {
+  return await postOdooInvoice(invoiceId);
 }
 
 

@@ -507,6 +507,16 @@ export async function payOdooInvoice(invoiceId: number, amount: number, paymentD
   }
 }
 
+export async function postOdooInvoice(invoiceId: number) {
+  try {
+    await execute('account.move', 'action_post', [[invoiceId]]);
+    return { success: true };
+  } catch (error: any) {
+    console.error('postOdooInvoice failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 
 
 

@@ -12,7 +12,8 @@ import {
   createInvoice, 
   getContacts,
   getProducts,
-  payInvoice
+  payInvoice,
+  postInvoice
 } from "@/app/lib/crm-service";
 import { 
   Receipt,
@@ -24,7 +25,8 @@ import {
   AlertCircle,
   CreditCard,
   Coins,
-  CheckCircle
+  CheckCircle,
+  ArrowRight
 } from 'lucide-react';
 
 interface InvoiceRecord {
@@ -70,6 +72,7 @@ export default function InvoicesPage() {
   const [payAmount, setPayAmount] = useState('');
   const [payDate, setPayDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [payJournalType, setPayJournalType] = useState<'bank' | 'cash'>('bank');
+  const [postingInvoiceId, setPostingInvoiceId] = useState<string | null>(null);
   
   // Form states
   const [selectedPartnerId, setSelectedPartnerId] = useState('0');
@@ -118,6 +121,22 @@ export default function InvoicesPage() {
       console.error(error);
     } finally {
       setIsPaying(false);
+    }
+  };
+
+  const handlePostInvoice = async (invoiceId: string) => {
+    try {
+      setPostingInvoiceId(invoiceId);
+      const res = await postInvoice(parseInt(invoiceId, 10));
+      if (res.success) {
+        loadData();
+      } else {
+        alert("Gagal mem-posting invoice di Odoo: " + res.error);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setPostingInvoiceId(null);
     }
   };
 
@@ -359,7 +378,23 @@ export default function InvoicesPage() {
                               <CreditCard className="h-3 w-3" /> Bayar
                             </Button>
                           ) : inv.state === 'draft' ? (
-                            <span className="text-xs text-muted-foreground italic font-semibold">Post dulu</span>
+                            <Button 
+                              size="sm" 
+                              disabled={postingInvoiceId === inv.id}
+                              onClick={() => handlePostInvoice(inv.id)}
+                              className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg flex items-center gap-1 shadow-md shadow-indigo-500/10 mx-auto animate-pulse"
+                            >
+                              {postingInvoiceId === inv.id ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  Posting...
+                                </>
+                              ) : (
+                                <>
+                                  <ArrowRight className="h-3 w-3" /> Post / Konfirmasi
+                                </>
+                              )}
+                            </Button>
                           ) : (
                             <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center justify-center gap-0.5">
                               <CheckCircle className="h-3.5 w-3.5" /> Selesai
