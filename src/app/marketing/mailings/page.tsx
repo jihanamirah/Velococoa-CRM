@@ -39,6 +39,7 @@ interface MailingCampaign {
   bodyHtml: string;
   campaignId: number;
   campaignName: string;
+  userId?: [number, string];
 }
 
 interface UtmCampaign {
@@ -210,10 +211,13 @@ export default function MailingsPage() {
   };
 
   // Filter campaigns
-  const filteredMailings = mailings.filter(m => 
-    m.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    m.campaignName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredMailings = mailings.filter(m => {
+    const creatorName = m.userId ? m.userId[1] : 'OdooBot';
+    const query = searchQuery.toLowerCase();
+    return m.subject.toLowerCase().includes(query) ||
+           m.campaignName.toLowerCase().includes(query) ||
+           creatorName.toLowerCase().includes(query);
+  });
 
   return (
     <CRMLayout>
@@ -336,8 +340,12 @@ export default function MailingsPage() {
 
                       return (
                         <tr key={m.id} className="hover:bg-muted/20 transition-colors">
-                          <td className="px-6 py-4 font-bold text-[#3b1a08] dark:text-white max-w-xs truncate">
-                            {m.subject}
+                          <td className="px-6 py-4 max-w-xs">
+                            <div className="font-bold text-[#3b1a08] dark:text-white truncate">{m.subject}</div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1 font-semibold">
+                              <span>Pembuat:</span>
+                              <span className="text-neutral-600 dark:text-neutral-400 font-bold">{m.userId ? m.userId[1] : 'OdooBot'}</span>
+                            </div>
                           </td>
                           <td className="px-6 py-4 text-xs font-medium text-muted-foreground">
                             {m.campaignName ? (

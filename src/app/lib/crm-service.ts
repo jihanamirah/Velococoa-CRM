@@ -433,7 +433,8 @@ export async function getMailings() {
       clicked: Number(m.clicked || 0),
       bodyHtml: String(m.body_html || ''),
       campaignId: campaignId,
-      campaignName: campaignName
+      campaignName: campaignName,
+      userId: m.user_id || undefined
     };
   });
 }

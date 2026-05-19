@@ -170,10 +170,13 @@ export default function CampaignsPage() {
   };
 
   // Filter campaigns by search
-  const filteredCampaigns = campaigns.filter(c => 
-    c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredCampaigns = campaigns.filter(c => {
+    const creatorName = c.user_id ? c.user_id[1] : 'OdooBot';
+    const query = searchQuery.toLowerCase();
+    return c.title.toLowerCase().includes(query) ||
+           c.name.toLowerCase().includes(query) ||
+           creatorName.toLowerCase().includes(query);
+  });
 
   // Grouping stages
   const defaultStages: CampaignStage[] = [

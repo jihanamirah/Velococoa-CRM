@@ -270,7 +270,7 @@ export async function getOdooContacts() {
 export async function getOdooMailings() {
   try {
     const rawXml = await execute('mailing.mailing', 'search_read', [[]], {
-      fields: ['id', 'subject', 'state', 'sent', 'delivered', 'opened', 'clicked', 'body_html', 'campaign_id'],
+      fields: ['id', 'subject', 'state', 'sent', 'delivered', 'opened', 'clicked', 'body_html', 'campaign_id', 'user_id'],
       limit: 100,
       order: 'id desc'
     });
