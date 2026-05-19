@@ -55,6 +55,8 @@ export default function CampaignsPage() {
   const [stages, setStages] = useState<CampaignStage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedAssignee, setSelectedAssignee] = useState('ALL');
+  const [selectedTagId, setSelectedTagId] = useState('ALL');
   
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -169,13 +171,28 @@ export default function CampaignsPage() {
     setNewCampaignName(autoSlug);
   };
 
-  // Filter campaigns by search
+  // Get list of unique assignees
+  const uniqueAssignees = Array.from(
+    new Set(
+      campaigns
+        .map(c => c.user_id ? c.user_id[1] : 'OdooBot')
+        .filter(Boolean)
+    )
+  );
+
+  // Filter campaigns by search and dropdowns
   const filteredCampaigns = campaigns.filter(c => {
     const creatorName = c.user_id ? c.user_id[1] : 'OdooBot';
     const query = searchQuery.toLowerCase();
-    return c.title.toLowerCase().includes(query) ||
-           c.name.toLowerCase().includes(query) ||
-           creatorName.toLowerCase().includes(query);
+    
+    const matchesSearch = c.title.toLowerCase().includes(query) ||
+                          c.name.toLowerCase().includes(query) ||
+                          creatorName.toLowerCase().includes(query);
+                          
+    const matchesAssignee = selectedAssignee === 'ALL' || creatorName === selectedAssignee;
+    const matchesTag = selectedTagId === 'ALL' || c.tag_ids.includes(Number(selectedTagId));
+    
+    return matchesSearch && matchesAssignee && matchesTag;
   });
 
   // Grouping stages
@@ -267,17 +284,41 @@ export default function CampaignsPage() {
             </p>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+          <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
             {/* Search Input */}
-            <div className="relative max-w-xs">
+            <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Cari kampanye..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 bg-white dark:bg-[#2A1D16] border-border rounded-xl focus-visible:ring-[#D05A1E] w-64 shadow-sm"
+                className="pl-9 bg-white dark:bg-[#2A1D16] border-border rounded-xl focus-visible:ring-[#D05A1E] w-full md:w-52 shadow-sm"
               />
             </div>
+            
+            {/* Filter Assignee */}
+            <select
+              value={selectedAssignee}
+              onChange={(e) => setSelectedAssignee(e.target.value)}
+              className="h-10 px-3 rounded-xl border border-border bg-white dark:bg-[#2A1D16] text-xs font-bold text-foreground focus-visible:ring-[#D05A1E] outline-none shadow-sm cursor-pointer dark:text-white"
+            >
+              <option value="ALL">👤 Semua Pembuat</option>
+              {uniqueAssignees.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+
+            {/* Filter Tag */}
+            <select
+              value={selectedTagId}
+              onChange={(e) => setSelectedTagId(e.target.value)}
+              className="h-10 px-3 rounded-xl border border-border bg-white dark:bg-[#2A1D16] text-xs font-bold text-foreground focus-visible:ring-[#D05A1E] outline-none shadow-sm cursor-pointer dark:text-white"
+            >
+              <option value="ALL">🏷️ Semua Tag</option>
+              {tags.map(t => (
+                <option key={t.id} value={String(t.id)}>{t.name}</option>
+              ))}
+            </select>
             
             <Button 
               onClick={() => {

@@ -53,6 +53,8 @@ export default function MailingsPage() {
   const [utmCampaigns, setUtmCampaigns] = useState<UtmCampaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCreator, setSelectedCreator] = useState('ALL');
+  const [selectedCampaignId, setSelectedCampaignId] = useState('ALL');
   
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -210,13 +212,28 @@ export default function MailingsPage() {
     }
   };
 
+  // Get list of unique creators
+  const uniqueCreators = Array.from(
+    new Set(
+      mailings
+        .map(m => m.userId ? m.userId[1] : 'OdooBot')
+        .filter(Boolean)
+    )
+  );
+
   // Filter campaigns
   const filteredMailings = mailings.filter(m => {
     const creatorName = m.userId ? m.userId[1] : 'OdooBot';
     const query = searchQuery.toLowerCase();
-    return m.subject.toLowerCase().includes(query) ||
-           m.campaignName.toLowerCase().includes(query) ||
-           creatorName.toLowerCase().includes(query);
+    
+    const matchesSearch = m.subject.toLowerCase().includes(query) ||
+                          m.campaignName.toLowerCase().includes(query) ||
+                          creatorName.toLowerCase().includes(query);
+                          
+    const matchesCreator = selectedCreator === 'ALL' || creatorName === selectedCreator;
+    const matchesCampaign = selectedCampaignId === 'ALL' || String(m.campaignId) === selectedCampaignId;
+    
+    return matchesSearch && matchesCreator && matchesCampaign;
   });
 
   return (
@@ -290,19 +307,46 @@ export default function MailingsPage() {
         {/* Campaign Table Card */}
         <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden">
           <CardHeader className="pb-4">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
                 <CardTitle className="text-xl font-bold text-[#3b1a08] dark:text-white">Daftar Mailing Broadcast</CardTitle>
                 <CardDescription>Menampilkan log pengiriman dari modul Odoo mass.mailing.</CardDescription>
               </div>
-              <div className="relative max-w-sm w-full">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Cari subjek email..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 bg-background border-border"
-                />
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:max-w-2xl justify-end">
+                {/* Search Input */}
+                <div className="relative max-w-xs w-full">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Cari subjek email..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 bg-background border-border w-full"
+                  />
+                </div>
+                
+                {/* Creator Filter */}
+                <select
+                  value={selectedCreator}
+                  onChange={(e) => setSelectedCreator(e.target.value)}
+                  className="h-10 px-3 rounded-lg border border-border bg-background text-xs font-semibold text-foreground focus-visible:ring-[#D05A1E] outline-none shadow-sm cursor-pointer dark:text-white"
+                >
+                  <option value="ALL">👤 Semua Pembuat</option>
+                  {uniqueCreators.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+
+                {/* UTM Campaign Filter */}
+                <select
+                  value={selectedCampaignId}
+                  onChange={(e) => setSelectedCampaignId(e.target.value)}
+                  className="h-10 px-3 rounded-lg border border-border bg-background text-xs font-semibold text-foreground focus-visible:ring-[#D05A1E] outline-none shadow-sm cursor-pointer max-w-[180px] truncate dark:text-white"
+                >
+                  <option value="ALL">🎯 Semua Kampanye</option>
+                  {utmCampaigns.map(c => (
+                    <option key={c.id} value={c.id}>{c.title}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </CardHeader>
