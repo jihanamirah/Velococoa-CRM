@@ -29,7 +29,8 @@ import {
   createOdooUtmCampaign,
   getOdooProducts,
   payOdooInvoice,
-  postOdooInvoice
+  postOdooInvoice,
+  updateOdooUtmCampaignStage
 } from '@/services/odoo';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -442,12 +443,70 @@ export async function createMailing(subject: string, campaignId: number, bodyHtm
 }
 
 export async function getUtmCampaigns() {
-  const campaigns = await getOdooUtmCampaigns();
-  return campaigns.map(c => ({
+  const data = await getOdooUtmCampaigns();
+  const rawCampaigns = Array.isArray(data) ? data : (data.campaigns || []);
+  return rawCampaigns.map((c: any) => ({
     id: String(c.id || ''),
     name: String(c.name || ''),
-    title: String(c.title || c.name || '')
+    title: String(c.title || c.name || ''),
+    stage_id: c.stage_id || undefined,
+    tag_ids: c.tag_ids || [],
+    mailing_mail_count: Number(c.mailing_mail_count || 0),
+    invoiced_amount: Number(c.invoiced_amount || 0),
+    user_id: c.user_id || undefined
   }));
+}
+
+export async function getUtmCampaignsKanban() {
+  const data = await getOdooUtmCampaigns();
+  
+  if (Array.isArray(data)) {
+    return {
+      campaigns: data.map(c => ({
+        id: String(c.id || ''),
+        name: String(c.name || ''),
+        title: String(c.title || c.name || ''),
+        stage_id: c.stage_id || undefined,
+        tag_ids: c.tag_ids || [],
+        mailing_mail_count: Number(c.mailing_mail_count || 0),
+        invoiced_amount: Number(c.invoiced_amount || 0),
+        user_id: c.user_id || undefined
+      })),
+      tags: [],
+      stages: []
+    };
+  }
+
+  const campaigns = (data.campaigns || []).map((c: any) => ({
+    id: String(c.id || ''),
+    name: String(c.name || ''),
+    title: String(c.title || c.name || ''),
+    stage_id: c.stage_id || undefined,
+    tag_ids: c.tag_ids || [],
+    mailing_mail_count: Number(c.mailing_mail_count || 0),
+    invoiced_amount: Number(c.invoiced_amount || 0),
+    user_id: c.user_id || undefined
+  }));
+
+  const tags = (data.tags || []).map((t: any) => ({
+    id: Number(t.id),
+    name: String(t.name)
+  }));
+
+  const stages = (data.stages || []).map((s: any) => ({
+    id: Number(s.id),
+    name: String(s.name)
+  }));
+
+  return {
+    campaigns,
+    tags,
+    stages
+  };
+}
+
+export async function updateUtmCampaignStage(campaignId: number, stageId: number) {
+  return await updateOdooUtmCampaignStage(campaignId, stageId);
 }
 
 export async function getInvoices() {

@@ -302,15 +302,37 @@ export async function createOdooMailing(subject: string, campaignId: number, bod
 
 export async function getOdooUtmCampaigns() {
   try {
-    const rawXml = await execute('utm.campaign', 'search_read', [[]], {
-      fields: ['id', 'name', 'title'],
-      limit: 100,
-      order: 'name asc'
-    });
-    return parseOdooRecords(rawXml);
+    const [rawCampaigns, rawTags, rawStages] = await Promise.all([
+      execute('utm.campaign', 'search_read', [[]], {
+        fields: ['id', 'name', 'title', 'stage_id', 'tag_ids', 'mailing_mail_count', 'invoiced_amount', 'user_id'],
+        limit: 100
+      }),
+      execute('utm.tag', 'search_read', [[]], {
+        fields: ['id', 'name']
+      }),
+      execute('utm.stage', 'search_read', [[]], {
+        fields: ['id', 'name']
+      })
+    ]);
+
+    return {
+      campaigns: parseOdooRecords(rawCampaigns),
+      tags: parseOdooRecords(rawTags),
+      stages: parseOdooRecords(rawStages)
+    };
   } catch (error) {
     console.error('getOdooUtmCampaigns failed:', error);
-    return [];
+    return { campaigns: [], tags: [], stages: [] };
+  }
+}
+
+export async function updateOdooUtmCampaignStage(campaignId: number, stageId: number) {
+  try {
+    await execute('utm.campaign', 'write', [[campaignId], { stage_id: stageId }]);
+    return { success: true };
+  } catch (error: any) {
+    console.error('updateOdooUtmCampaignStage failed:', error);
+    return { success: false, error: error.message };
   }
 }
 
