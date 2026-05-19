@@ -73,7 +73,27 @@ export default function CampaignsPage() {
     try {
       setIsLoading(true);
       const res = await getUtmCampaignsKanban();
-      setCampaigns(res.campaigns || []);
+      const rawCampaigns = res.campaigns || [];
+      
+      // Filter specifically for PT VeloCocoa relevant campaign data
+      const velococoaCampaigns = rawCampaigns.filter((c: any) => {
+        const text = (c.title + ' ' + c.name).toLowerCase();
+        return text.includes('velococoa') || 
+               text.includes('mitra') || 
+               text.includes('ethicocoa') || 
+               text.includes('chocora') || 
+               text.includes('cpo') ||
+               text.includes('satyagraha') ||
+               text.includes('campaign') ||
+               text.includes('special') ||
+               text.includes('seasonal') ||
+               text.includes('offer') ||
+               text.includes('partner') ||
+               text.includes('promo') ||
+               text.includes('job');
+      });
+
+      setCampaigns(velococoaCampaigns);
       setTags(res.tags || []);
       setStages(res.stages || []);
     } catch (error) {
