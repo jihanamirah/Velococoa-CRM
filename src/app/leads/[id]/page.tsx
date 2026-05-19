@@ -644,6 +644,63 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   </div>
                 </div>
 
+                <Separator className="bg-border/50" />
+
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#D05A1E] mb-3 flex items-center gap-1.5">
+                    📢 Odoo Marketing & Ownership Info
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl bg-muted/10 border border-border/30 text-sm space-y-3.5">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block mb-1">Company Name</span>
+                        <span className="font-semibold text-foreground flex items-center gap-1.5">
+                          🏢 {lead.namaPerusahaan}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block mb-1">Address</span>
+                        <span className="font-semibold text-foreground flex items-center gap-1.5">
+                          📍 {lead.kota || '-'}, Indonesia
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block mb-1">Contact Name</span>
+                        <span className="font-semibold text-foreground flex items-center gap-1.5">
+                          👤 {lead.namaLengkap}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-muted/10 border border-border/30 text-sm space-y-3.5">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block mb-1">Campaign</span>
+                        <span className="font-semibold text-foreground flex items-center gap-1.5">
+                          📣 {lead.campaignName || '-'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block mb-1">Medium</span>
+                        <span className="font-semibold text-foreground flex items-center gap-1.5">
+                          🎯 {lead.mediumName || '-'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block mb-1">Source</span>
+                        <span className="font-semibold text-foreground flex items-center gap-1.5">
+                          💡 {lead.sourceName || '-'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block mb-1">Referred By</span>
+                        <span className="font-semibold text-foreground flex items-center gap-1.5">
+                          🔗 {lead.referred || '-'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wider font-semibold">Catatan Mitra</div>
                   {isEditing ? (

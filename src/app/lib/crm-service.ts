@@ -66,6 +66,13 @@ export interface Lead {
   createdAt: string;
   promoMinat?: string;
   estimasiVolume?: string;
+  campaignId?: number;
+  campaignName?: string;
+  mediumId?: number;
+  mediumName?: string;
+  sourceId?: number;
+  sourceName?: string;
+  referred?: string;
 }
 
 function cleanDescription(desc: string): string {
@@ -168,7 +175,14 @@ function mapOdooToLead(odoo: any): Lead {
     sumber: 'Odoo CRM',
     createdAt: String(odoo.create_date || new Date().toISOString()),
     estimasiVolume: parsedVolume,
-    promoMinat: parsedPromo
+    promoMinat: parsedPromo,
+    campaignId: Array.isArray(odoo.campaign_id) ? Number(odoo.campaign_id[0]) : undefined,
+    campaignName: Array.isArray(odoo.campaign_id) ? String(odoo.campaign_id[1]) : undefined,
+    mediumId: Array.isArray(odoo.medium_id) ? Number(odoo.medium_id[0]) : undefined,
+    mediumName: Array.isArray(odoo.medium_id) ? String(odoo.medium_id[1]) : undefined,
+    sourceId: Array.isArray(odoo.source_id) ? Number(odoo.source_id[0]) : undefined,
+    sourceName: Array.isArray(odoo.source_id) ? String(odoo.source_id[1]) : undefined,
+    referred: odoo.referred ? String(odoo.referred) : undefined
   };
 }
 

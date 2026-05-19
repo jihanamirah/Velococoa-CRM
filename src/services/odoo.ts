@@ -87,7 +87,8 @@ export async function getOdooLeads() {
       fields: [
         'id', 'name', 'contact_name', 'email_from', 'phone', 
         'city', 'description', 'stage_id', 'probability', 
-        'priority', 'create_date', 'active'
+        'priority', 'create_date', 'active',
+        'campaign_id', 'medium_id', 'source_id', 'referred'
       ],
       limit: 100,
       order: 'create_date desc'
@@ -105,7 +106,8 @@ export async function getOdooLeadById(id: number) {
       fields: [
         'id', 'name', 'contact_name', 'email_from', 'phone', 
         'city', 'description', 'stage_id', 'probability', 
-        'priority', 'create_date', 'active'
+        'priority', 'create_date', 'active',
+        'campaign_id', 'medium_id', 'source_id', 'referred'
       ]
     });
     const records = parseOdooRecords(rawXml);

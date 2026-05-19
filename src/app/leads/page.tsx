@@ -108,6 +108,12 @@ export default function LeadsPage() {
                       {lead.namaLengkap}
                     </div>
 
+                    {lead.campaignName && (
+                      <div className="text-xs text-[#D05A1E] font-medium flex items-center gap-1">
+                        📣 <span className="font-semibold">{lead.campaignName}</span>
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap items-center gap-3 pt-2">
                       <Badge 
                         variant="secondary"
