@@ -21,9 +21,9 @@ import Link from 'next/link';
 
 const KANBAN_COLUMNS = [
   { id: 'Baru', name: 'New Lead', color: 'border-t-amber-500 bg-amber-500/5' },
+  { id: 'Qualified', name: 'Qualified', color: 'border-t-green-500 bg-green-500/5' },
   { id: 'Dihubungi', name: 'Contacted', color: 'border-t-blue-500 bg-blue-500/5' },
   { id: 'Negotiation', name: 'Negotiation', color: 'border-t-purple-500 bg-purple-500/5' },
-  { id: 'Qualified', name: 'Qualified', color: 'border-t-green-500 bg-green-500/5' },
   { id: 'Won', name: 'Won', color: 'border-t-[#2D6A4F] bg-[#2D6A4F]/5' },
   { id: 'Lost', name: 'Lost', color: 'border-t-[#C1121F] bg-[#C1121F]/5' }
 ] as const;
