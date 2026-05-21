@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,16 +34,19 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9F5F0] dark:bg-[#1F140F] flex items-center justify-center p-4 transition-all duration-500">
+    <div className="min-h-screen bg-[#F9F5F0] dark:bg-[#23201E] flex items-center justify-center p-4 transition-all duration-500 relative">
+      <div className="absolute top-4 right-4 z-50">
+        <ThemeToggle />
+      </div>
       
       {/* View 1: Portal / Module Selection */}
       {activeSection === 'PORTAL' && (
         <div className="w-full max-w-4xl space-y-8 animate-in fade-in zoom-in-95 duration-500">
           <div className="text-center space-y-3">
-            <div className="mx-auto w-20 h-20 rounded-3xl flex items-center justify-center shadow-xl bg-white dark:bg-[#2A1D16] overflow-hidden p-2 border border-primary/10">
+            <div className="mx-auto w-20 h-20 rounded-3xl flex items-center justify-center shadow-xl bg-white dark:bg-[#322F2C] overflow-hidden p-2 border border-primary/10">
               <img src="/logo.png" alt="VeloCocoa Logo" className="w-full h-full object-cover" />
             </div>
-            <h1 className="text-4xl font-extrabold tracking-tight text-[#3B1A08] dark:text-white">
+            <h1 className="text-4xl font-extrabold tracking-tight text-[#4C382D] dark:text-white">
               VeloCocoa <span className="text-primary italic font-light">Enterprise Portal</span>
             </h1>
             <p className="text-muted-foreground text-sm max-w-md mx-auto">
@@ -55,16 +59,19 @@ export default function LoginPage() {
             {/* Card 1: Marketing */}
             <div 
               onClick={() => setActiveSection('LOGIN_MARKETING')}
-              className="group cursor-pointer bg-white dark:bg-[#2A1D16] rounded-3xl p-6 border border-border/50 hover:border-teal-500/50 shadow-lg hover:shadow-teal-500/5 transition-all duration-300 transform hover:-translate-y-1.5 flex flex-col justify-between h-64 relative overflow-hidden"
+              className="group cursor-pointer bg-white dark:bg-[#322F2C] rounded-3xl p-6 border border-border/50 hover:border-teal-500/50 shadow-lg hover:shadow-teal-500/5 transition-all duration-300 transform hover:-translate-y-1.5 flex flex-col justify-between h-64 relative overflow-hidden"
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/5 blur-3xl rounded-full group-hover:bg-teal-500/10 transition-colors" />
+              <div className="absolute top-3 right-3 bg-teal-500 text-white text-[9px] font-black tracking-widest px-2 py-0.5 rounded-full uppercase">
+                Terintegrasi Odoo
+              </div>
               
               <div className="space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                   <Megaphone className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-[#3B1A08] dark:text-white group-hover:text-teal-500 transition-colors">Marketing</h3>
+                  <h3 className="text-lg font-bold text-[#4C382D] dark:text-white group-hover:text-teal-500 transition-colors">Marketing</h3>
                   <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
                     Automasi kampanye, prospek pelanggan (Lead Gen), analitik sosial, dan optimasi konversi produk.
                   </p>
@@ -78,7 +85,7 @@ export default function LoginPage() {
             {/* Card 2: CRM (Active & Integrated) */}
             <div 
               onClick={() => setActiveSection('LOGIN_CRM')}
-              className="group cursor-pointer bg-[#3B1A08] dark:bg-primary/10 rounded-3xl p-6 border-2 border-primary/40 hover:border-primary shadow-2xl hover:shadow-primary/10 transition-all duration-300 transform hover:-translate-y-1.5 flex flex-col justify-between h-64 relative overflow-hidden text-white"
+              className="group cursor-pointer bg-[#4C382D] dark:bg-primary/10 rounded-3xl p-6 border-2 border-primary/40 hover:border-primary shadow-2xl hover:shadow-primary/10 transition-all duration-300 transform hover:-translate-y-1.5 flex flex-col justify-between h-64 relative overflow-hidden text-white"
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-3xl rounded-full" />
               <div className="absolute top-3 right-3 bg-primary text-[9px] font-black tracking-widest px-2 py-0.5 rounded-full uppercase">
@@ -106,16 +113,19 @@ export default function LoginPage() {
             {/* Card 3: Accounting */}
             <div 
               onClick={() => setActiveSection('LOGIN_ACCOUNTING')}
-              className="group cursor-pointer bg-white dark:bg-[#2A1D16] rounded-3xl p-6 border border-border/50 hover:border-indigo-500/50 shadow-lg hover:shadow-indigo-500/5 transition-all duration-300 transform hover:-translate-y-1.5 flex flex-col justify-between h-64 relative overflow-hidden"
+              className="group cursor-pointer bg-white dark:bg-[#322F2C] rounded-3xl p-6 border border-border/50 hover:border-indigo-500/50 shadow-lg hover:shadow-indigo-500/5 transition-all duration-300 transform hover:-translate-y-1.5 flex flex-col justify-between h-64 relative overflow-hidden"
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full group-hover:bg-indigo-500/10 transition-colors" />
+              <div className="absolute top-3 right-3 bg-indigo-500 text-white text-[9px] font-black tracking-widest px-2 py-0.5 rounded-full uppercase">
+                Terintegrasi Odoo
+              </div>
               
               <div className="space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                   <Wallet className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-[#3B1A08] dark:text-white group-hover:text-indigo-500 transition-colors">Accounting</h3>
+                  <h3 className="text-lg font-bold text-[#4C382D] dark:text-white group-hover:text-indigo-500 transition-colors">Accounting</h3>
                   <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
                     Pengawasan kas, manajemen invoice, laporan rugi laba, dan pencatatan ledger Odoo Accounting.
                   </p>
@@ -137,7 +147,7 @@ export default function LoginPage() {
       {/* View 2: CRM Login Form */}
       {activeSection === 'LOGIN_CRM' && (
         <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <Card className="border-2 border-primary/20 shadow-2xl bg-white dark:bg-[#2A1D16] overflow-hidden rounded-3xl">
+          <Card className="border-2 border-primary/20 shadow-2xl bg-white dark:bg-[#322F2C] overflow-hidden rounded-3xl">
             <div className="h-2 bg-primary w-full" />
             
             <CardHeader className="space-y-4 text-center pt-8 relative">
@@ -153,7 +163,7 @@ export default function LoginPage() {
               <div className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-2 overflow-hidden border border-primary/10 bg-white">
                 <img src="/logo.png" alt="VeloCocoa Logo" className="w-full h-full object-cover" />
               </div>
-              <CardTitle className="text-3xl font-bold tracking-tight text-[#3B1A08] dark:text-white">
+              <CardTitle className="text-3xl font-bold tracking-tight text-[#4C382D] dark:text-white">
                 VeloCocoa <span className="text-primary italic font-light">CRM</span>
               </CardTitle>
               <CardDescription className="text-muted-foreground">
@@ -216,7 +226,7 @@ export default function LoginPage() {
       {/* View 3: Marketing Login Form */}
       {activeSection === 'LOGIN_MARKETING' && (
         <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <Card className="border-2 border-teal-500/20 shadow-2xl bg-white dark:bg-[#2A1D16] overflow-hidden rounded-3xl">
+          <Card className="border-2 border-teal-500/20 shadow-2xl bg-white dark:bg-[#322F2C] overflow-hidden rounded-3xl">
             <div className="h-2 bg-teal-500 w-full" />
             
             <CardHeader className="space-y-4 text-center pt-8 relative">
@@ -232,7 +242,7 @@ export default function LoginPage() {
               <div className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-2 overflow-hidden border border-teal-500/10 bg-white">
                 <img src="/logo.png" alt="VeloCocoa Logo" className="w-full h-full object-cover" />
               </div>
-              <CardTitle className="text-3xl font-bold tracking-tight text-[#3B1A08] dark:text-white">
+              <CardTitle className="text-3xl font-bold tracking-tight text-[#4C382D] dark:text-white">
                 VeloCocoa <span className="text-teal-500 italic font-light">Marketing</span>
               </CardTitle>
               <CardDescription className="text-muted-foreground">
@@ -295,7 +305,7 @@ export default function LoginPage() {
       {/* View 4: Accounting Login Form */}
       {activeSection === 'LOGIN_ACCOUNTING' && (
         <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <Card className="border-2 border-indigo-500/20 shadow-2xl bg-white dark:bg-[#2A1D16] overflow-hidden rounded-3xl">
+          <Card className="border-2 border-indigo-500/20 shadow-2xl bg-white dark:bg-[#322F2C] overflow-hidden rounded-3xl">
             <div className="h-2 bg-indigo-500 w-full" />
             
             <CardHeader className="space-y-4 text-center pt-8 relative">
@@ -311,7 +321,7 @@ export default function LoginPage() {
               <div className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-2 overflow-hidden border border-indigo-500/10 bg-white">
                 <img src="/logo.png" alt="VeloCocoa Logo" className="w-full h-full object-cover" />
               </div>
-              <CardTitle className="text-3xl font-bold tracking-tight text-[#3B1A08] dark:text-white">
+              <CardTitle className="text-3xl font-bold tracking-tight text-[#4C382D] dark:text-white">
                 VeloCocoa <span className="text-indigo-500 italic font-light">Accounting</span>
               </CardTitle>
               <CardDescription className="text-muted-foreground">

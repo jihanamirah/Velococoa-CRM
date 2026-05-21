@@ -110,6 +110,8 @@ export default function KanbanPage() {
         <div className="flex-1 flex gap-4 overflow-x-auto pb-4 no-scrollbar">
           {KANBAN_COLUMNS.map((column) => {
             const stageLeads = leads.filter(l => l.status === column.id);
+            const totalRevenue = stageLeads.reduce((sum, lead) => sum + (lead.expectedRevenue || 0), 0);
+            const formattedTotalRevenue = `Rp ${Math.round(totalRevenue / 1000).toLocaleString('en-US')}k`;
 
             return (
               <div key={column.id} className="min-w-[320px] w-[320px] flex flex-col gap-4">
@@ -119,6 +121,12 @@ export default function KanbanPage() {
                     <Badge variant="secondary" className="bg-muted text-muted-foreground rounded-full h-5 px-1.5 text-[10px]">
                       {stageLeads.length}
                     </Badge>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs font-bold text-muted-foreground">
+                    <Link href="/leads/new" className="text-muted-foreground hover:text-primary transition-colors text-sm font-semibold leading-none" title="Tambah Lead Baru">
+                      +
+                    </Link>
+                    <span>{formattedTotalRevenue}</span>
                   </div>
                 </div>
 
@@ -142,11 +150,18 @@ export default function KanbanPage() {
                             </Badge>
                           </div>
                           
-                          <Link href={`/leads/${lead.id}`}>
-                            <h4 className="font-semibold text-sm group-hover:text-primary transition-colors line-clamp-2 leading-snug">
-                              {lead.namaPerusahaan}
-                            </h4>
-                          </Link>
+                          <div className="space-y-1">
+                            <Link href={`/leads/${lead.id}`}>
+                              <h4 className="font-semibold text-sm group-hover:text-primary transition-colors line-clamp-2 leading-snug">
+                                {lead.namaPerusahaan}
+                              </h4>
+                            </Link>
+                            {lead.expectedRevenue !== undefined && lead.expectedRevenue > 0 && (
+                              <div className="text-[11px] font-medium text-foreground/80">
+                                Rp {lead.expectedRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                            )}
+                          </div>
 
                           <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                              <div className="flex items-center gap-1">

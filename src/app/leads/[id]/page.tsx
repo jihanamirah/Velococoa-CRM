@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   ArrowLeft, 
   MapPin, 
@@ -31,7 +32,9 @@ import {
   Check,
   Send,
   Loader2,
-  Search
+  Search,
+  HelpCircle,
+  Receipt
 } from 'lucide-react';
 import { 
   getLeadById, 
@@ -43,11 +46,24 @@ import {
   addCommunicationLog,
   getScheduledActivities,
   createScheduledActivity,
-  getContacts
+  getContacts,
+  getMediums,
+  getSources,
+  getCountries,
+  getStates,
+  getSalesTeams,
+  getUtmCampaigns,
+  findOrCreateUtm,
+  getQuotations,
+  createQuotation,
+  createContact,
+  getLeads
 } from '@/app/lib/crm-service';
 import { syncLeadToOdoo } from '@/services/odoo';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { OdooMany2One } from '@/components/ui/odoo-many2one';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -56,6 +72,14 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [lead, setLead] = useState<Lead | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Quotation and smart buttons states
+  const [leadQuotations, setLeadQuotations] = useState<any[]>([]);
+  const [similarLeadsCount, setSimilarLeadsCount] = useState<number>(0);
+  const [isNewQuoteModalOpen, setIsNewQuoteModalOpen] = useState(false);
+  const [quoteCustomerType, setQuoteCustomerType] = useState<'create' | 'link' | 'none'>('link');
+  const [selectedPartnerId, setSelectedPartnerId] = useState<number | undefined>(undefined);
+  const [isCreatingQuote, setIsCreatingQuote] = useState(false);
 
   // Editable fields states
   const [isEditing, setIsEditing] = useState(false);
@@ -67,6 +91,67 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [kategoriBisnis, setKategoriBisnis] = useState('');
   const [catatan, setCatatan] = useState('');
   const [catatanInternal, setCatatanInternal] = useState('');
+
+  // New Odoo and address states
+  const [street, setStreet] = useState('');
+  const [street2, setStreet2] = useState('');
+  const [zip, setZip] = useState('');
+  const [stateId, setStateId] = useState<number | undefined>(undefined);
+  const [countryId, setCountryId] = useState<number | undefined>(undefined);
+  const [jobPosition, setJobPosition] = useState('');
+  const [website, setWebsite] = useState('');
+  const [campaignId, setCampaignId] = useState<number | undefined>(undefined);
+  const [mediumId, setMediumId] = useState<number | undefined>(undefined);
+  const [sourceId, setSourceId] = useState<number | undefined>(undefined);
+  const [referred, setReferred] = useState('');
+  const [salesTeamId, setSalesTeamId] = useState<number | undefined>(undefined);
+  const [promoMinat, setPromoMinat] = useState('');
+  const [estimasiVolume, setEstimasiVolume] = useState('');
+
+  // Manual input state variables for UTM fields
+  const [campaignManualMode, setCampaignManualMode] = useState(false);
+  const [mediumManualMode, setMediumManualMode] = useState(false);
+  const [sourceManualMode, setSourceManualMode] = useState(false);
+  const [campaignManualText, setCampaignManualText] = useState('');
+  const [mediumManualText, setMediumManualText] = useState('');
+  const [sourceManualText, setSourceManualText] = useState('');
+
+  // Expected revenue, probability, expected closing
+  const [expectedRevenue, setExpectedRevenue] = useState<number>(0);
+  const [probability, setProbability] = useState<number>(0);
+  const [dateDeadline, setDateDeadline] = useState<string>('');
+
+  // Dropdown list options
+  const [campaignOptions, setCampaignOptions] = useState<any[]>([]);
+  const [mediumOptions, setMediumOptions] = useState<any[]>([]);
+  const [sourceOptions, setSourceOptions] = useState<any[]>([]);
+  const [countryOptions, setCountryOptions] = useState<any[]>([]);
+  const [stateOptions, setStateOptions] = useState<any[]>([]);
+  const [salesTeamOptions, setSalesTeamOptions] = useState<any[]>([]);
+
+  // Load dropdown options once on mount
+  useEffect(() => {
+    getUtmCampaigns().then((campaigns) => {
+      const filtered = campaigns.filter((u: any) => {
+        const text = ((u.title || '') + ' ' + (u.name || '')).toLowerCase();
+        return text.includes('velococoa') || 
+               text.includes('mitra') || 
+               text.includes('ethicocoa') || 
+               text.includes('chocora') || 
+               text.includes('campaign');
+      });
+      setCampaignOptions(filtered);
+    }).catch(console.error);
+    getMediums().then(setMediumOptions).catch(console.error);
+    getSources().then(setSourceOptions).catch(console.error);
+    getCountries().then(setCountryOptions).catch(console.error);
+    getSalesTeams().then(setSalesTeamOptions).catch(console.error);
+  }, []);
+
+  // Fetch states whenever countryId changes
+  useEffect(() => {
+    getStates(countryId).then(setStateOptions).catch(console.error);
+  }, [countryId]);
 
   // Communication logs & Scheduled activities states
   const [logs, setLogs] = useState<any[]>([]);
@@ -98,9 +183,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
   const [attendeeSearchQuery, setAttendeeSearchQuery] = useState('');
 
-  // Load Odoo contacts for the meeting attendees picker
+  // Load Odoo contacts for meeting attendees and new quote customer selection
   useEffect(() => {
-    if (isAddLogOpen && contactsList.length === 0) {
+    if ((isAddLogOpen || isNewQuoteModalOpen) && contactsList.length === 0) {
       setIsContactsLoading(true);
       getContacts().then((c) => {
         setContactsList(c);
@@ -110,7 +195,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         setIsContactsLoading(false);
       });
     }
-  }, [isAddLogOpen, contactsList.length]);
+  }, [isAddLogOpen, isNewQuoteModalOpen, contactsList.length]);
 
   const fetchLogsAndActivities = async () => {
     try {
@@ -159,6 +244,43 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         setKategoriBisnis(l.kategoriBisnis || 'Lainnya');
         setCatatan(l.catatan || '');
         setCatatanInternal(l.catatanInternal || '');
+
+        // Map new fields
+        setStreet(l.street || '');
+        setStreet2(l.street2 || '');
+        setZip(l.zip || '');
+        setStateId(l.stateId);
+        setCountryId(l.countryId);
+        setJobPosition(l.jobPosition || '');
+        setWebsite(l.website || '');
+        setCampaignId(l.campaignId);
+        setMediumId(l.mediumId);
+        setSourceId(l.sourceId);
+        setReferred(l.referred || '');
+        setSalesTeamId(l.salesTeamId);
+        setPromoMinat(l.promoMinat || '');
+        setEstimasiVolume(l.estimasiVolume || '');
+
+        // Initialize manual mode variables
+        setCampaignManualMode(false);
+        setMediumManualMode(false);
+        setSourceManualMode(false);
+        setCampaignManualText(l.campaignName || '');
+        setMediumManualText(l.mediumName || '');
+        setSourceManualText(l.sourceName || '');
+
+        setExpectedRevenue(l.expectedRevenue || 0);
+        setProbability(l.probability || 0);
+        setDateDeadline(l.dateDeadline || '');
+
+        // Fetch quotations & similar leads count
+        getQuotations(l.id).then(setLeadQuotations).catch(console.error);
+        getLeads().then((allLeads) => {
+          const count = allLeads.filter(
+            (item) => item.kategoriBisnis === l.kategoriBisnis && item.id !== l.id
+          ).length;
+          setSimilarLeadsCount(count);
+        }).catch(console.error);
       }
       setIsLoading(false);
     });
@@ -182,6 +304,60 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const handleSaveDetails = async () => {
     if (!lead) return;
     setIsLoading(true);
+
+    const selectedCampaign = campaignOptions.find(o => o.id === campaignId);
+    const selectedMedium = mediumOptions.find(o => o.id === mediumId);
+    const selectedSource = sourceOptions.find(o => o.id === sourceId);
+    const selectedCountry = countryOptions.find(o => o.id === countryId);
+    const selectedState = stateOptions.find(o => o.id === stateId);
+    const selectedSalesTeam = salesTeamOptions.find(o => o.id === salesTeamId);
+
+    // Resolve UTM Campaign, Medium, and Source using find-or-create if in manual mode
+    let finalCampaignId = campaignId;
+    let finalCampaignName = selectedCampaign ? selectedCampaign.name : undefined;
+    if (campaignManualMode) {
+      if (campaignManualText.trim()) {
+        const res = await findOrCreateUtm('utm.campaign', campaignManualText.trim());
+        if (res.success && res.id) {
+          finalCampaignId = res.id;
+          finalCampaignName = res.name;
+        }
+      } else {
+        finalCampaignId = null as any;
+        finalCampaignName = '';
+      }
+    }
+
+    let finalMediumId = mediumId;
+    let finalMediumName = selectedMedium ? selectedMedium.name : undefined;
+    if (mediumManualMode) {
+      if (mediumManualText.trim()) {
+        const res = await findOrCreateUtm('utm.medium', mediumManualText.trim());
+        if (res.success && res.id) {
+          finalMediumId = res.id;
+          finalMediumName = res.name;
+        }
+      } else {
+        finalMediumId = null as any;
+        finalMediumName = '';
+      }
+    }
+
+    let finalSourceId = sourceId;
+    let finalSourceName = selectedSource ? selectedSource.name : undefined;
+    if (sourceManualMode) {
+      if (sourceManualText.trim()) {
+        const res = await findOrCreateUtm('utm.source', sourceManualText.trim());
+        if (res.success && res.id) {
+          finalSourceId = res.id;
+          finalSourceName = res.name;
+        }
+      } else {
+        finalSourceId = null as any;
+        finalSourceName = '';
+      }
+    }
+
     const updated = await updateLeadDetails(lead.id, {
       namaPerusahaan,
       namaLengkap,
@@ -189,7 +365,30 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       telepon,
       kota,
       kategoriBisnis,
-      catatan
+      catatan,
+      street,
+      street2,
+      zip,
+      stateId,
+      stateName: selectedState ? selectedState.name : undefined,
+      countryId,
+      countryName: selectedCountry ? selectedCountry.name : undefined,
+      jobPosition,
+      website,
+      campaignId: finalCampaignId,
+      campaignName: finalCampaignName,
+      mediumId: finalMediumId,
+      mediumName: finalMediumName,
+      sourceId: finalSourceId,
+      sourceName: finalSourceName,
+      referred,
+      salesTeamId,
+      salesTeamName: selectedSalesTeam ? selectedSalesTeam.name : undefined,
+      promoMinat,
+      estimasiVolume,
+      expectedRevenue,
+      probability,
+      dateDeadline: dateDeadline || ''
     });
     if (updated) {
       setLead(updated);
@@ -253,6 +452,85 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       });
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleCreateQuotation = async () => {
+    if (!lead) return;
+    setIsCreatingQuote(true);
+    try {
+      let partnerId: number | undefined = undefined;
+
+      if (quoteCustomerType === 'create') {
+        const custName = lead.namaPerusahaan || lead.namaLengkap || 'Mitra Baru';
+        const contactRes = await createContact(custName, lead.email || undefined, lead.telepon || undefined);
+        if (contactRes.success && contactRes.id) {
+          partnerId = contactRes.id;
+          toast({
+            title: "Kontak Dibuat",
+            description: `Berhasil membuat kontak baru: ${custName}`,
+          });
+        } else {
+          throw new Error(contactRes.error || "Gagal membuat kontak baru.");
+        }
+      } else if (quoteCustomerType === 'link') {
+        if (!selectedPartnerId) {
+          toast({
+            variant: "destructive",
+            title: "Hubungkan Kontak",
+            description: "Silakan pilih kontak yang ingin dihubungkan.",
+          });
+          setIsCreatingQuote(false);
+          return;
+        }
+        partnerId = selectedPartnerId;
+      } else {
+        // Fallback or "Do not link to a customer"
+        // Let's search for "Mitra Umum" in contactsList
+        const existingMitraUmum = contactsList.find(
+          (c) => c.name.toLowerCase() === 'mitra umum'
+        );
+        if (existingMitraUmum) {
+          partnerId = existingMitraUmum.id;
+        } else {
+          // Create "Mitra Umum"
+          const contactRes = await createContact("Mitra Umum");
+          if (contactRes.success && contactRes.id) {
+            partnerId = contactRes.id;
+          } else {
+            throw new Error(contactRes.error || "Gagal membuat kontak fallback 'Mitra Umum'.");
+          }
+        }
+      }
+
+      if (!partnerId) {
+        throw new Error("Gagal menentukan Partner ID untuk Quotation.");
+      }
+
+      const quoteRes = await createQuotation({
+        partnerId,
+        opportunityId: parseInt(lead.id, 10),
+        orderLines: []
+      });
+
+      if (quoteRes.success && quoteRes.id) {
+        toast({
+          title: "Quotation Dibuat",
+          description: "Berhasil membuat Quotation baru di Odoo.",
+        });
+        setIsNewQuoteModalOpen(false);
+        router.push(`/quotations/${quoteRes.id}`);
+      } else {
+        throw new Error(quoteRes.error || "Gagal membuat Quotation.");
+      }
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Gagal Membuat Quotation",
+        description: err.message || "Terjadi kesalahan saat menghubungi Odoo.",
+      });
+    } finally {
+      setIsCreatingQuote(false);
     }
   };
 
@@ -444,14 +722,72 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 <span className="text-xs text-muted-foreground">• Lead masuk {new Date(lead.createdAt).toLocaleDateString('id-ID')}</span>
               </div>
               <h1 className="text-3xl font-bold tracking-tight">{lead.namaPerusahaan}</h1>
+              
+              {/* Expected Revenue & Probability Section */}
+              <div className="flex flex-wrap gap-12 mt-4 mb-2">
+                <div className="space-y-0.5">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Expected Revenue</div>
+                  {isEditing ? (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded border">Rp</span>
+                      <Input 
+                        type="number"
+                        placeholder="0"
+                        value={expectedRevenue || ''} 
+                        onChange={(e) => setExpectedRevenue(parseFloat(e.target.value) || 0)} 
+                        className="w-36 bg-background/50 h-8 border-primary/20 focus-visible:ring-primary text-sm font-medium"
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-2xl font-bold tracking-tight text-foreground flex items-baseline gap-1 mt-1">
+                      <span className="text-sm font-semibold text-muted-foreground">Rp</span>
+                      <span>{(expectedRevenue || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-0.5">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    Probability 
+                    <Badge className="bg-amber-500/15 text-amber-600 hover:bg-amber-500/20 text-[9px] px-1 py-0.5 border-none font-bold uppercase tracking-wider">AI</Badge>
+                  </div>
+                  {isEditing ? (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <Input 
+                        type="number"
+                        min="0"
+                        max="100"
+                        placeholder="0"
+                        value={probability || ''} 
+                        onChange={(e) => setProbability(parseFloat(e.target.value) || 0)} 
+                        className="w-20 bg-background/50 h-8 border-primary/20 focus-visible:ring-primary text-sm font-medium"
+                      />
+                      <span className="text-sm font-semibold text-muted-foreground">%</span>
+                    </div>
+                  ) : (
+                    <div className="text-2xl font-medium text-muted-foreground mt-1 flex items-baseline gap-1">
+                      <span className="text-sm font-semibold text-muted-foreground">at</span>
+                      <span className="text-foreground font-bold">{probability || 0}</span>
+                      <span className="text-sm font-semibold text-muted-foreground">%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setIsNewQuoteModalOpen(true)}
+              className="bg-[#C17B3A] hover:bg-[#A0642D] text-white"
+            >
+              <Receipt className="mr-2 h-4 w-4" />
+              New Quotation
+            </Button>
             {lead.status === 'Qualified' && !lead.sudahSyncOdoo && (
               <Button 
                 onClick={handleOdooSync} 
                 disabled={isSyncing}
-                className="bg-[#C17B3A] hover:bg-[#A0642D] text-white"
+                className="bg-transparent border border-[#C17B3A]/40 text-[#C17B3A] hover:bg-[#C17B3A]/10"
               >
                 {isSyncing ? <RefreshCcw className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
                 Sync ke Odoo CRM
@@ -467,6 +803,50 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
+            {/* Smart Buttons Row */}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button 
+                variant="outline" 
+                className="h-10 px-4 border-[#C17B3A]/20 hover:bg-[#C17B3A]/5 text-foreground flex items-center gap-2 rounded-xl bg-card/40 backdrop-blur-sm"
+                onClick={() => {
+                  setIsAddLogOpen(true);
+                  setIsScheduled(true);
+                }}
+              >
+                <Calendar className="h-4 w-4 text-[#C17B3A]" />
+                <span className="font-semibold text-xs">
+                  {activities.length > 0 
+                    ? `${activities.length} Meetings` 
+                    : "No Meeting"}
+                </span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-10 px-4 border-[#C17B3A]/20 hover:bg-[#C17B3A]/5 text-foreground flex items-center gap-2 rounded-xl bg-card/40 backdrop-blur-sm"
+                onClick={() => router.push(`/quotations?leadId=${lead.id}`)}
+              >
+                <Receipt className="h-4 w-4 text-[#C17B3A]" />
+                <span className="font-semibold text-xs">
+                  Quotations {leadQuotations.length}
+                </span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-10 px-4 border-[#C17B3A]/20 hover:bg-[#C17B3A]/5 text-foreground flex items-center gap-2 rounded-xl bg-card/40 backdrop-blur-sm"
+                onClick={() => {
+                  toast({
+                    title: "Similar Leads",
+                    description: `Ditemukan ${similarLeadsCount} lead dengan kategori bisnis serupa: "${lead.kategoriBisnis || 'Lainnya'}".`,
+                  });
+                }}
+              >
+                <Sparkles className="h-4 w-4 text-[#C17B3A]" />
+                <span className="font-semibold text-xs">
+                  Similar Leads {similarLeadsCount}
+                </span>
+              </Button>
+            </div>
+
             <Card className="border-none shadow-xl bg-card/40 backdrop-blur-sm">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
@@ -485,235 +865,553 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10 text-primary mt-1">
-                        <Building2 className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Perusahaan</div>
-                        {isEditing ? (
-                          <Input 
-                            className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
-                            value={namaPerusahaan} 
-                            onChange={(e) => setNamaPerusahaan(e.target.value)} 
-                          />
-                        ) : (
-                          <div className="font-semibold">{lead.namaPerusahaan}</div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10 text-primary mt-1">
-                        <User className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Penanggung Jawab</div>
-                        {isEditing ? (
-                          <Input 
-                            className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
-                            value={namaLengkap} 
-                            onChange={(e) => setNamaLengkap(e.target.value)} 
-                          />
-                        ) : (
-                          <div className="font-semibold">{lead.namaLengkap}</div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10 text-primary mt-1">
-                        <MapPin className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Lokasi</div>
-                        {isEditing ? (
-                          <Input 
-                            className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
-                            value={kota} 
-                            onChange={(e) => setKota(e.target.value)} 
-                          />
-                        ) : (
-                          <div className="font-semibold">{lead.kota}</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10 text-primary mt-1">
-                        <Mail className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Email</div>
-                        {isEditing ? (
-                          <Input 
-                            className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
-                            value={email} 
-                            onChange={(e) => setEmail(e.target.value)} 
-                          />
-                        ) : (
-                          <div className="font-semibold">{lead.email}</div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10 text-primary mt-1">
-                        <Phone className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Telepon</div>
-                        {isEditing ? (
-                          <Input 
-                            className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
-                            value={telepon} 
-                            onChange={(e) => setTelepon(e.target.value)} 
-                          />
-                        ) : (
-                          <div className="font-semibold">{lead.telepon}</div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10 text-primary mt-1">
-                        <Sparkles className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Kategori Bisnis</div>
-                        {isEditing ? (
-                          <Input 
-                            className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
-                            value={kategoriBisnis} 
-                            onChange={(e) => setKategoriBisnis(e.target.value)} 
-                          />
-                        ) : (
-                          <div className="font-semibold">{lead.kategoriBisnis || 'Lainnya'}</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <div className="space-y-8">
+                  {/* First row: Company Info & Contact Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                    {/* COMPANY INFORMATION COLUMN */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-[#C17B3A] border-b pb-2">
+                        COMPANY INFORMATION
+                      </h3>
+                      
+                      <div className="space-y-3.5">
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block">Company Name</label>
+                          {isEditing ? (
+                            <Input 
+                              className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                              value={namaPerusahaan} 
+                              onChange={(e) => setNamaPerusahaan(e.target.value)} 
+                            />
+                          ) : (
+                            <div className="text-sm font-medium mt-1 flex items-center gap-2">
+                              🏢 {lead.namaPerusahaan}
+                            </div>
+                          )}
+                        </div>
 
-                {/* Quick Action Buttons (Call, WhatsApp, Email) */}
-                <div className="pt-2 flex flex-col gap-3">
-                  <Button 
-                    className="w-full bg-[#D05A1E] hover:bg-[#B34914] text-white font-bold h-12 flex items-center justify-center gap-2 rounded-xl shadow-lg shadow-orange-500/10 transition-all hover:scale-[1.01]"
-                    onClick={() => {
-                      setIsCallModalOpen(true);
-                      setCallState('calling');
-                      setCallDuration(0);
-                      // Simulated call pickup for premium experience
-                      setTimeout(() => {
-                        setCallState('ongoing');
-                      }, 1500);
-                    }}
-                  >
-                    <PhoneCall className="h-4 w-4 animate-bounce" /> Call Customer Interface
-                  </Button>
-                  <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block mb-1">Address</label>
+                          {isEditing ? (
+                            <div className="space-y-2 mt-1">
+                              <Input 
+                                placeholder="Street..." 
+                                className="bg-background/50 h-8 border-primary/20 focus-visible:ring-primary" 
+                                value={street} 
+                                onChange={(e) => setStreet(e.target.value)} 
+                              />
+                              <Input 
+                                placeholder="Street 2..." 
+                                className="bg-background/50 h-8 border-primary/20 focus-visible:ring-primary" 
+                                value={street2} 
+                                onChange={(e) => setStreet2(e.target.value)} 
+                              />
+                              <div className="grid grid-cols-2 gap-2">
+                                <Input 
+                                  placeholder="City" 
+                                  className="bg-background/50 h-8 border-primary/20 focus-visible:ring-primary" 
+                                  value={kota} 
+                                  onChange={(e) => setKota(e.target.value)} 
+                                />
+                                <Input 
+                                  placeholder="ZIP" 
+                                  className="bg-background/50 h-8 border-primary/20 focus-visible:ring-primary" 
+                                  value={zip} 
+                                  onChange={(e) => setZip(e.target.value)} 
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <OdooMany2One 
+                                    value={countryId} 
+                                    onChange={(id) => setCountryId(id)} 
+                                    options={countryOptions} 
+                                    placeholder="Pilih Negara" 
+                                    label="Negara"
+                                  />
+                                </div>
+                                <div>
+                                  <OdooMany2One 
+                                    value={stateId} 
+                                    onChange={(id) => setStateId(id)} 
+                                    options={stateOptions} 
+                                    placeholder="Pilih Provinsi" 
+                                    label="Provinsi"
+                                    disabled={!countryId}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-foreground space-y-0.5 mt-1 bg-muted/20 p-3 rounded-lg border border-border/40 leading-relaxed font-sans">
+                              {street && <div>{street}</div>}
+                              {street2 && <div>{street2}</div>}
+                              {(kota || zip) && (
+                                <div>
+                                  {kota} {zip}
+                                </div>
+                              )}
+                              {(lead.stateName || lead.countryName) && (
+                                <div className="text-muted-foreground font-semibold">
+                                  {lead.stateName ? lead.stateName : ''}
+                                  {lead.stateName && lead.countryName ? ', ' : ''}
+                                  {lead.countryName ? lead.countryName : ''}
+                                </div>
+                              )}
+                              {!street && !street2 && !kota && !zip && !lead.stateName && !lead.countryName && (
+                                <span className="text-muted-foreground italic">Alamat belum diisi</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block">Business Category</label>
+                          {isEditing ? (
+                            <Select value={kategoriBisnis} onValueChange={setKategoriBisnis}>
+                              <SelectTrigger className="bg-background/50 h-8 mt-1 border-primary/20">
+                                <SelectValue placeholder="Pilih Kategori" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Kafe & Kedai Kopi">Kafe & Kedai Kopi</SelectItem>
+                                <SelectItem value="Bakery & Pastry">Bakery & Pastry</SelectItem>
+                                <SelectItem value="Hotel & Korporasi">Hotel & Korporasi</SelectItem>
+                                <SelectItem value="Lainnya">Lainnya</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <div className="text-sm font-medium mt-1">
+                              ✨ {lead.kategoriBisnis || 'Lainnya'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* CONTACT INFORMATION COLUMN */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-[#C17B3A] border-b pb-2">
+                        CONTACT INFORMATION
+                      </h3>
+                      
+                      <div className="space-y-3.5">
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block">Contact Name</label>
+                          {isEditing ? (
+                            <Input 
+                              className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                              value={namaLengkap} 
+                              onChange={(e) => setNamaLengkap(e.target.value)} 
+                            />
+                          ) : (
+                            <div className="text-sm font-medium mt-1 flex items-center gap-2">
+                              👤 {lead.namaLengkap}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block">Job Position</label>
+                          {isEditing ? (
+                            <Input 
+                              placeholder="Contoh: Owner, Purchasing Manager..."
+                              className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                              value={jobPosition} 
+                              onChange={(e) => setJobPosition(e.target.value)} 
+                            />
+                          ) : (
+                            <div className="text-sm font-medium mt-1">
+                              💼 {lead.jobPosition || <span className="text-muted-foreground italic">-</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block">Email</label>
+                          {isEditing ? (
+                            <Input 
+                              className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                              value={email} 
+                              onChange={(e) => setEmail(e.target.value)} 
+                            />
+                          ) : (
+                            <div className="text-sm font-medium mt-1 flex items-center gap-2">
+                              ✉️ {lead.email || <span className="text-muted-foreground italic">-</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block">Phone</label>
+                          {isEditing ? (
+                            <Input 
+                              className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                              value={telepon} 
+                              onChange={(e) => setTelepon(e.target.value)} 
+                            />
+                          ) : (
+                            <div className="text-sm font-medium mt-1 flex items-center gap-2">
+                              📞 {lead.telepon || <span className="text-muted-foreground italic">-</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block">Website</label>
+                          {isEditing ? (
+                            <Input 
+                              placeholder="https://example.com"
+                              className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                              value={website} 
+                              onChange={(e) => setWebsite(e.target.value)} 
+                            />
+                          ) : (
+                            <div className="text-sm font-medium mt-1 flex items-center gap-2">
+                              🌐 {lead.website ? (
+                                <a href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                                  {lead.website} <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ) : (
+                                <span className="text-muted-foreground italic">-</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Action Buttons (Call, WhatsApp, Email) */}
+                  <div className="pt-2 flex flex-col gap-3">
                     <Button 
-                      className="bg-[#25D366] hover:bg-[#128C7E] text-white font-bold h-10 flex items-center justify-center gap-2 rounded-lg transition-all"
-                      onClick={handleWhatsAppClick}
+                      className="w-full bg-[#D05A1E] hover:bg-[#B34914] text-white font-bold h-12 flex items-center justify-center gap-2 rounded-xl shadow-lg shadow-orange-500/10 transition-all hover:scale-[1.01]"
+                      onClick={() => {
+                        setIsCallModalOpen(true);
+                        setCallState('calling');
+                        setCallDuration(0);
+                        setTimeout(() => {
+                          setCallState('ongoing');
+                        }, 1500);
+                      }}
                     >
-                      <MessageSquare className="h-4 w-4 fill-current" /> WhatsApp
+                      <PhoneCall className="h-4 w-4 animate-bounce" /> Call Customer Interface
                     </Button>
-                    <Button 
-                      variant="outline"
-                      className="border-primary/20 hover:bg-primary/5 text-foreground font-bold h-10 flex items-center justify-center gap-2 rounded-lg transition-all"
-                      onClick={handleEmailClick}
-                    >
-                      <Mail className="h-4 w-4" /> Send Email
-                    </Button>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button 
+                        className="bg-[#25D366] hover:bg-[#128C7E] text-white font-bold h-10 flex items-center justify-center gap-2 rounded-lg transition-all"
+                        onClick={handleWhatsAppClick}
+                      >
+                        <MessageSquare className="h-4 w-4 fill-current" /> WhatsApp
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        className="border-primary/20 hover:bg-primary/5 text-foreground font-bold h-10 flex items-center justify-center gap-2 rounded-lg transition-all"
+                        onClick={handleEmailClick}
+                      >
+                        <Mail className="h-4 w-4" /> Send Email
+                      </Button>
+                    </div>
                   </div>
-                </div>
 
-                <Separator className="bg-border/50" />
+                  <Separator className="bg-border/50" />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Second row: Marketing & Ownership */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                    {/* MARKETING COLUMN */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-[#C17B3A] border-b pb-2 flex items-center gap-1.5">
+                        MARKETING
+                      </h3>
+                      
+                      <div className="space-y-3.5">
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                            Campaign
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <HelpCircle className="h-3 w-3 text-muted-foreground/75 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Kampanye pemasaran UTM yang menghasilkan lead ini.
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </label>
+                          {isEditing ? (
+                            <div className="mt-1 space-y-1">
+                              {campaignManualMode ? (
+                                <Input 
+                                  placeholder="Ketik kampanye kustom..."
+                                  className="bg-background/50 h-8 border-primary/20 focus-visible:ring-primary"
+                                  value={campaignManualText}
+                                  onChange={(e) => setCampaignManualText(e.target.value)}
+                                />
+                              ) : (
+                                <OdooMany2One 
+                                  value={campaignId} 
+                                  onChange={(id) => setCampaignId(id)} 
+                                  options={campaignOptions} 
+                                  placeholder="Pilih Kampanye (Campaign)" 
+                                  label="Campaign"
+                                />
+                              )}
+                              <div className="flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCampaignManualMode(!campaignManualMode);
+                                    if (!campaignManualMode && campaignId) {
+                                      const opt = campaignOptions.find(o => o.id === campaignId);
+                                      setCampaignManualText(opt ? opt.name : '');
+                                    }
+                                  }}
+                                  className="text-[10px] text-primary hover:underline font-semibold"
+                                >
+                                  {campaignManualMode ? "← Pilih dari list" : "✏️ Isi manual"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm font-medium mt-1">
+                              📢 {lead.campaignName || <span className="text-muted-foreground italic">-</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                            Medium
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <HelpCircle className="h-3 w-3 text-muted-foreground/75 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Media pemasaran UTM (e.g. Email, Banner, CPC).
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </label>
+                          {isEditing ? (
+                            <div className="mt-1 space-y-1">
+                              {mediumManualMode ? (
+                                <Input 
+                                  placeholder="Ketik media kustom..."
+                                  className="bg-background/50 h-8 border-primary/20 focus-visible:ring-primary"
+                                  value={mediumManualText}
+                                  onChange={(e) => setMediumManualText(e.target.value)}
+                                />
+                              ) : (
+                                <OdooMany2One 
+                                  value={mediumId} 
+                                  onChange={(id) => setMediumId(id)} 
+                                  options={mediumOptions} 
+                                  placeholder="Pilih Media (Medium)" 
+                                  label="Medium"
+                                />
+                              )}
+                              <div className="flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setMediumManualMode(!mediumManualMode);
+                                    if (!mediumManualMode && mediumId) {
+                                      const opt = mediumOptions.find(o => o.id === mediumId);
+                                      setMediumManualText(opt ? opt.name : '');
+                                    }
+                                  }}
+                                  className="text-[10px] text-primary hover:underline font-semibold"
+                                >
+                                  {mediumManualMode ? "← Pilih dari list" : "✏️ Isi manual"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm font-medium mt-1">
+                              🎯 {lead.mediumName || <span className="text-muted-foreground italic">-</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                            Source
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <HelpCircle className="h-3 w-3 text-muted-foreground/75 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Sumber pemasaran UTM (e.g. Google, Newsletter, LinkedIn).
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </label>
+                          {isEditing ? (
+                            <div className="mt-1 space-y-1">
+                              {sourceManualMode ? (
+                                <Input 
+                                  placeholder="Ketik sumber kustom..."
+                                  className="bg-background/50 h-8 border-primary/20 focus-visible:ring-primary"
+                                  value={sourceManualText}
+                                  onChange={(e) => setSourceManualText(e.target.value)}
+                                />
+                              ) : (
+                                <OdooMany2One 
+                                  value={sourceId} 
+                                  onChange={(id) => setSourceId(id)} 
+                                  options={sourceOptions} 
+                                  placeholder="Pilih Sumber (Source)" 
+                                  label="Source"
+                                />
+                              )}
+                              <div className="flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSourceManualMode(!sourceManualMode);
+                                    if (!sourceManualMode && sourceId) {
+                                      const opt = sourceOptions.find(o => o.id === sourceId);
+                                      setSourceManualText(opt ? opt.name : '');
+                                    }
+                                  }}
+                                  className="text-[10px] text-primary hover:underline font-semibold"
+                                >
+                                  {sourceManualMode ? "← Pilih dari list" : "✏️ Isi manual"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm font-medium mt-1">
+                              💡 {lead.sourceName || <span className="text-muted-foreground italic">-</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block">Referred By</label>
+                          {isEditing ? (
+                            <Input 
+                              className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                              value={referred} 
+                              onChange={(e) => setReferred(e.target.value)} 
+                            />
+                          ) : (
+                            <div className="text-sm font-medium mt-1">
+                              🔗 {lead.referred || <span className="text-muted-foreground italic">-</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block">Interest Promo</label>
+                          {isEditing ? (
+                            <Input 
+                              className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                              value={promoMinat} 
+                              onChange={(e) => setPromoMinat(e.target.value)} 
+                            />
+                          ) : (
+                            <div className="text-sm font-medium mt-1 bg-muted/20 p-2.5 rounded-lg border border-border/40 italic">
+                              🎁 {lead.promoMinat || <span className="text-muted-foreground italic">Tidak ada promo spesifik</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block">Volume Est.</label>
+                          {isEditing ? (
+                            <Input 
+                              className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary" 
+                              value={estimasiVolume} 
+                              onChange={(e) => setEstimasiVolume(e.target.value)} 
+                            />
+                          ) : (
+                            <div className="text-sm font-medium mt-1 bg-muted/20 p-2.5 rounded-lg border border-border/40">
+                              📦 {lead.estimasiVolume || <span className="text-muted-foreground italic">Belum diketahui</span>}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* OWNERSHIP COLUMN */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-[#C17B3A] border-b pb-2 flex items-center gap-1.5">
+                        OWNERSHIP
+                      </h3>
+                      
+                      <div className="space-y-3.5">
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground block">Sales Team</label>
+                          {isEditing ? (
+                            <div className="mt-1">
+                              <OdooMany2One 
+                                value={salesTeamId} 
+                                onChange={(id) => setSalesTeamId(id)} 
+                                options={salesTeamOptions} 
+                                placeholder="Pilih Tim Penjualan" 
+                                label="Sales Team"
+                              />
+                            </div>
+                          ) : (
+                            <div className="text-sm font-medium mt-1">
+                              👥 {lead.salesTeamName || <span className="text-muted-foreground italic">Belum ditentukan</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                            Expected Closing
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <HelpCircle className="h-3 w-3 text-muted-foreground/75 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Estimasi tanggal penutupan penjualan lead ini.
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </label>
+                          {isEditing ? (
+                            <Input 
+                              type="date"
+                              className="bg-background/50 h-8 mt-1 border-primary/20 focus-visible:ring-primary font-sans"
+                              value={dateDeadline}
+                              onChange={(e) => setDateDeadline(e.target.value)}
+                            />
+                          ) : (
+                            <div className="text-sm font-medium mt-1 flex items-center gap-2">
+                              📅 {dateDeadline ? new Date(dateDeadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : <span className="text-muted-foreground italic">No closing estimate</span>}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator className="bg-border/50" />
+
+                  {/* Description / Catatan Mitra */}
                   <div>
-                    <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wider font-semibold">Promo Minat</div>
-                    <div className="p-3 rounded-lg bg-muted/30 border border-border/50 text-sm italic">
-                      {lead.promoMinat || 'Tidak ada promo spesifik'}
-                    </div>
+                    <label className="text-xs font-semibold text-muted-foreground block mb-2">Catatan Mitra</label>
+                    {isEditing ? (
+                      <Textarea 
+                        className="bg-background/50 min-h-[80px] border-primary/20 focus-visible:ring-primary" 
+                        value={catatan} 
+                        onChange={(e) => setCatatan(e.target.value)} 
+                      />
+                    ) : (
+                      <div className="p-4 rounded-xl bg-muted/20 text-sm leading-relaxed border border-border/40 whitespace-pre-wrap font-sans text-foreground">
+                        {lead.catatan || 'Tidak ada catatan tambahan.'}
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wider font-semibold">Estimasi Volume</div>
-                    <div className="p-3 rounded-lg bg-muted/30 border border-border/50 text-sm">
-                      {lead.estimasiVolume || 'Belum diketahui'}
-                    </div>
-                  </div>
-                </div>
-
-                <Separator className="bg-border/50" />
-
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#D05A1E] mb-3 flex items-center gap-1.5">
-                    📢 Odoo Marketing & Ownership Info
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-xl bg-muted/10 border border-border/30 text-sm space-y-3.5">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block mb-1">Company Name</span>
-                        <span className="font-semibold text-foreground flex items-center gap-1.5">
-                          🏢 {lead.namaPerusahaan}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block mb-1">Address</span>
-                        <span className="font-semibold text-foreground flex items-center gap-1.5">
-                          📍 {lead.kota || '-'}, Indonesia
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block mb-1">Contact Name</span>
-                        <span className="font-semibold text-foreground flex items-center gap-1.5">
-                          👤 {lead.namaLengkap}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-xl bg-muted/10 border border-border/30 text-sm space-y-3.5">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block mb-1">Campaign</span>
-                        <span className="font-semibold text-foreground flex items-center gap-1.5">
-                          📣 {lead.campaignName || '-'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block mb-1">Medium</span>
-                        <span className="font-semibold text-foreground flex items-center gap-1.5">
-                          🎯 {lead.mediumName || '-'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block mb-1">Source</span>
-                        <span className="font-semibold text-foreground flex items-center gap-1.5">
-                          💡 {lead.sourceName || '-'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block mb-1">Referred By</span>
-                        <span className="font-semibold text-foreground flex items-center gap-1.5">
-                          🔗 {lead.referred || '-'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wider font-semibold">Catatan Mitra</div>
-                  {isEditing ? (
-                    <Textarea 
-                      className="bg-background/50 min-h-[80px] border-primary/20 focus-visible:ring-primary" 
-                      value={catatan} 
-                      onChange={(e) => setCatatan(e.target.value)} 
-                    />
-                  ) : (
-                    <div className="p-4 rounded-xl bg-muted/20 text-sm leading-relaxed">
-                      {lead.catatan || 'Tidak ada catatan tambahan.'}
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1284,6 +1982,110 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 </Button>
               </div>
             </form>
+          </div>
+        )}
+
+        {/* New Quotation Modal Dialog */}
+        {isNewQuoteModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="bg-card w-full max-w-lg p-6 rounded-2xl shadow-2xl border border-primary/20 space-y-6 animate-in zoom-in-95 duration-200 text-left relative">
+              <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                <h2 className="text-lg font-bold flex items-center gap-2 text-foreground">
+                  <Receipt className="h-5 w-5 text-[#C17B3A]" /> New Quotation
+                </h2>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setIsNewQuoteModalOpen(false)}
+                  className="text-muted-foreground hover:bg-muted/10"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground font-semibold">Quotation Customer</label>
+                  <div className="space-y-2.5">
+                    <label className="flex items-center gap-2.5 text-sm font-medium cursor-pointer">
+                      <input
+                        type="radio"
+                        name="quoteCustomerType"
+                        value="create"
+                        checked={quoteCustomerType === 'create'}
+                        onChange={() => setQuoteCustomerType('create')}
+                        className="h-4 w-4 rounded-full border-primary/20 text-[#C17B3A] focus:ring-[#C17B3A]"
+                      />
+                      <span>Create a new customer ({lead.namaPerusahaan || lead.namaLengkap || 'Mitra Baru'})</span>
+                    </label>
+                    <label className="flex items-center gap-2.5 text-sm font-medium cursor-pointer">
+                      <input
+                        type="radio"
+                        name="quoteCustomerType"
+                        value="link"
+                        checked={quoteCustomerType === 'link'}
+                        onChange={() => setQuoteCustomerType('link')}
+                        className="h-4 w-4 rounded-full border-primary/20 text-[#C17B3A] focus:ring-[#C17B3A]"
+                      />
+                      <span>Link to an existing customer</span>
+                    </label>
+                    <label className="flex items-center gap-2.5 text-sm font-medium cursor-pointer">
+                      <input
+                        type="radio"
+                        name="quoteCustomerType"
+                        value="none"
+                        checked={quoteCustomerType === 'none'}
+                        onChange={() => setQuoteCustomerType('none')}
+                        className="h-4 w-4 rounded-full border-primary/20 text-[#C17B3A] focus:ring-[#C17B3A]"
+                      />
+                      <span>Do not link to a customer (Mitra Umum)</span>
+                    </label>
+                  </div>
+                </div>
+
+                {quoteCustomerType === 'link' && (
+                  <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                    <label className="text-xs text-muted-foreground font-semibold">Customer</label>
+                    <OdooMany2One
+                      value={selectedPartnerId}
+                      onChange={(id) => setSelectedPartnerId(id)}
+                      options={contactsList}
+                      placeholder="Select Customer..."
+                      label="Customer"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-4 border-t border-border/30">
+                <Button 
+                  onClick={handleCreateQuotation}
+                  disabled={isCreatingQuote}
+                  className="flex-1 bg-[#C17B3A] hover:bg-[#A0642D] text-white font-bold animate-pulse-subtle"
+                >
+                  {isCreatingQuote ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4 mr-1" />
+                      Confirm
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  onClick={() => setIsNewQuoteModalOpen(false)}
+                  className="text-muted-foreground hover:bg-muted/10 font-medium"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
           </div>
         )}
           </div>

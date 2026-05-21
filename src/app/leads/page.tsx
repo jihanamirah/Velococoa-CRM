@@ -98,6 +98,16 @@ export default function LeadsPage() {
                           <Building2 className="h-3 w-3" /> {lead.kategoriBisnis}
                         </div>
                         <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">{lead.namaPerusahaan}</h3>
+                        {lead.expectedRevenue !== undefined && lead.expectedRevenue > 0 && (
+                          <div className="text-sm font-semibold text-foreground/80 mt-1">
+                            Rp {lead.expectedRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {lead.probability !== undefined && lead.probability > 0 && (
+                              <span className="text-xs font-normal text-muted-foreground ml-1.5">
+                                ({lead.probability}%)
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 

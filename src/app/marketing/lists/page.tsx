@@ -149,7 +149,7 @@ export default function ListsPage() {
         {/* Header */}
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-[#3b1a08] dark:text-white flex items-center gap-2">
+            <h2 className="text-3xl font-bold tracking-tight text-[#4C382D] dark:text-white flex items-center gap-2">
               <Users2 className="h-8 w-8 text-[#D05A1E] animate-pulse" /> Mailing List & Database Prospek
             </h2>
             <p className="text-muted-foreground text-sm">
@@ -179,10 +179,10 @@ export default function ListsPage() {
           
           {/* Left 1/3: Mailing Lists Segment List */}
           <div className="lg:col-span-1 space-y-6">
-            <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden">
+            <Card className="border-none shadow-lg bg-white dark:bg-[#322F2C] rounded-2xl overflow-hidden">
               <CardHeader className="border-b border-border/20 bg-muted/10 pb-4 flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg font-bold text-[#3b1a08] dark:text-white flex items-center gap-1.5">
+                  <CardTitle className="text-lg font-bold text-[#4C382D] dark:text-white flex items-center gap-1.5">
                     <Database className="h-5 w-5 text-[#D05A1E]" /> Segmen List Odoo
                   </CardTitle>
                   <CardDescription className="text-xs">Segmen mailing list aktif di Odoo ERP.</CardDescription>
@@ -203,7 +203,7 @@ export default function ListsPage() {
                   mailingLists.map(list => (
                     <div key={list.id} className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors">
                       <div>
-                        <span className="block font-bold text-sm text-[#3b1a08] dark:text-white">{list.name}</span>
+                        <span className="block font-bold text-sm text-[#4C382D] dark:text-white">{list.name}</span>
                         <span className="text-[10px] text-muted-foreground uppercase font-black tracking-wider bg-slate-500/10 px-1.5 py-0.5 rounded mt-1 inline-block">
                           ID Odoo: {list.id}
                         </span>
@@ -220,11 +220,11 @@ export default function ListsPage() {
 
           {/* Right 2/3: Subscriber Contacts Database */}
           <div className="lg:col-span-2 space-y-6">
-            <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden">
+            <Card className="border-none shadow-lg bg-white dark:bg-[#322F2C] rounded-2xl overflow-hidden">
               <CardHeader className="pb-4">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
-                    <CardTitle className="text-xl font-bold text-[#3b1a08] dark:text-white flex items-center gap-2">
+                    <CardTitle className="text-xl font-bold text-[#4C382D] dark:text-white flex items-center gap-2">
                       <Users2 className="h-6 w-6 text-[#D05A1E]" /> Database Pelanggan Mailing List
                     </CardTitle>
                     <CardDescription>Menampilkan daftar alamat email prospek yang terdaftar di Odoo mailing.contact.</CardDescription>
@@ -250,7 +250,7 @@ export default function ListsPage() {
                 ) : filteredContacts.length === 0 ? (
                   <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-2">
                     <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
-                    <span className="font-semibold text-[#3b1a08] dark:text-white">Tidak ada kontak ditemukan</span>
+                    <span className="font-semibold text-[#4C382D] dark:text-white">Tidak ada kontak ditemukan</span>
                     <span className="text-xs">Ubah kata kunci pencarian atau daftarkan kontak baru.</span>
                   </div>
                 ) : (
@@ -267,7 +267,7 @@ export default function ListsPage() {
                         {filteredContacts.map(contact => {
                           return (
                             <tr key={contact.id} className="hover:bg-muted/20 transition-colors">
-                              <td className="px-6 py-4 font-bold text-[#3b1a08] dark:text-white">
+                              <td className="px-6 py-4 font-bold text-[#4C382D] dark:text-white">
                                 {contact.name === 'No Name' || !contact.name ? (
                                   <span className="italic text-muted-foreground/60 font-medium">Pelanggan Anonim</span>
                                 ) : (

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { usePathname } from 'next/navigation';
 import { 
   LayoutDashboard, 
@@ -65,6 +66,7 @@ export function CRMLayout({ children }: { children: React.ReactNode }) {
     { icon: Users, label: 'Daftar Leads', href: '/leads' },
     { icon: Kanban, label: 'Pipeline Kanban', href: '/kanban' },
     { icon: PlusCircle, label: 'Tambah Lead', href: '/leads/new' },
+    { icon: Receipt, label: 'Penawaran (Quotations)', href: '/quotations' },
   ];
 
   if (isMarketing) {
@@ -237,6 +239,7 @@ export function CRMLayout({ children }: { children: React.ReactNode }) {
             </div>
             
             <div className="flex items-center gap-4">
+              <ThemeToggle />
               <Link href="/notifications">
                 <Button variant="ghost" size="icon" className="relative">
                   <Bell className="h-5 w-5" />

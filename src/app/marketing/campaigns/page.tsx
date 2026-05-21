@@ -233,7 +233,7 @@ export default function CampaignsPage() {
       'bg-indigo-500 text-white',
       'bg-emerald-500 text-white',
       'bg-purple-500 text-white',
-      'bg-amber-500 text-[#3b1a08]',
+      'bg-amber-500 text-[#4C382D]',
       'bg-rose-500 text-white',
       'bg-teal-500 text-white',
       'bg-blue-500 text-white'
@@ -268,12 +268,12 @@ export default function CampaignsPage() {
 
   return (
     <CRMLayout>
-      <div className="flex-1 space-y-6 p-8 pt-6 bg-gradient-to-br from-[#FCF9F7] via-[#FFFDFD] to-[#FAF8F5] dark:from-[#1A110C] dark:to-[#221610] min-h-screen">
+      <div className="flex-1 space-y-6 p-8 pt-6 bg-gradient-to-br from-[#FCF9F7] via-[#FFFDFD] to-[#FAF8F5] dark:from-[#23201E] dark:to-[#2B2826] min-h-screen">
         
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-extrabold tracking-tight text-[#3b1a08] dark:text-white flex items-center gap-2.5">
+            <h2 className="text-3xl font-extrabold tracking-tight text-[#4C382D] dark:text-white flex items-center gap-2.5">
               <span className="p-2 bg-gradient-to-br from-[#D05A1E]/20 to-orange-500/5 rounded-xl border border-[#D05A1E]/30">
                 <Target className="h-8 w-8 text-[#D05A1E]" />
               </span>
@@ -292,7 +292,7 @@ export default function CampaignsPage() {
                 placeholder="Cari kampanye..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 bg-white dark:bg-[#2A1D16] border-border rounded-xl focus-visible:ring-[#D05A1E] w-full md:w-52 shadow-sm"
+                className="pl-9 bg-white dark:bg-[#322F2C] border-border rounded-xl focus-visible:ring-[#D05A1E] w-full md:w-52 shadow-sm"
               />
             </div>
             
@@ -300,7 +300,7 @@ export default function CampaignsPage() {
             <select
               value={selectedAssignee}
               onChange={(e) => setSelectedAssignee(e.target.value)}
-              className="h-10 px-3 rounded-xl border border-border bg-white dark:bg-[#2A1D16] text-xs font-bold text-foreground focus-visible:ring-[#D05A1E] outline-none shadow-sm cursor-pointer dark:text-white"
+              className="h-10 px-3 rounded-xl border border-border bg-white dark:bg-[#322F2C] text-xs font-bold text-foreground focus-visible:ring-[#D05A1E] outline-none shadow-sm cursor-pointer dark:text-white"
             >
               <option value="ALL">👤 Semua Pembuat</option>
               {uniqueAssignees.map(name => (
@@ -312,7 +312,7 @@ export default function CampaignsPage() {
             <select
               value={selectedTagId}
               onChange={(e) => setSelectedTagId(e.target.value)}
-              className="h-10 px-3 rounded-xl border border-border bg-white dark:bg-[#2A1D16] text-xs font-bold text-foreground focus-visible:ring-[#D05A1E] outline-none shadow-sm cursor-pointer dark:text-white"
+              className="h-10 px-3 rounded-xl border border-border bg-white dark:bg-[#322F2C] text-xs font-bold text-foreground focus-visible:ring-[#D05A1E] outline-none shadow-sm cursor-pointer dark:text-white"
             >
               <option value="ALL">🏷️ Semua Tag</option>
               {tags.map(t => (
@@ -339,7 +339,7 @@ export default function CampaignsPage() {
               <div className="absolute h-12 w-12 rounded-full border-4 border-orange-500/20 animate-pulse"></div>
               <Loader2 className="h-8 w-8 animate-spin text-[#D05A1E]" />
             </div>
-            <span className="font-semibold text-[#3b1a08] dark:text-neutral-200 mt-2">Menghubungkan ke Odoo XML-RPC...</span>
+            <span className="font-semibold text-[#4C382D] dark:text-neutral-200 mt-2">Menghubungkan ke Odoo XML-RPC...</span>
             <span className="text-xs text-neutral-400">Menyinkronkan status, tag, dan data keuangan realtime.</span>
           </div>
         ) : (
@@ -363,12 +363,12 @@ export default function CampaignsPage() {
               }
 
               return (
-                <div key={stage.id} className="flex flex-col bg-[#F3ECE8]/40 dark:bg-[#1E140F]/60 rounded-2xl p-4 border border-neutral-200/50 dark:border-neutral-800/50 min-h-[500px] w-full shadow-inner shadow-[#FCFAF8]/40">
+                <div key={stage.id} className="flex flex-col bg-[#F3ECE8]/40 dark:bg-[#23201E]/60 rounded-2xl p-4 border border-neutral-200/50 dark:border-neutral-800/50 min-h-[500px] w-full shadow-inner shadow-[#FCFAF8]/40">
                   
                   {/* Column Header */}
                   <div className={`flex items-center justify-between bg-gradient-to-b ${colHeaderBg} px-3 py-2 rounded-xl border-x border-b border-neutral-200/30 dark:border-neutral-800/20 mb-4`}>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-[#3b1a08] dark:text-neutral-100 text-sm">
+                      <span className="font-bold text-[#4C382D] dark:text-neutral-100 text-sm">
                         {stage.name}
                       </span>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-black ${colBadgeColor}`}>
@@ -404,7 +404,7 @@ export default function CampaignsPage() {
                         return (
                           <Card 
                             key={c.id} 
-                            className="group border border-neutral-200/60 dark:border-neutral-800/80 bg-white dark:bg-[#231812] hover:border-[#D05A1E]/40 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 rounded-xl shadow-sm overflow-hidden"
+                            className="group border border-neutral-200/60 dark:border-neutral-800/80 bg-white dark:bg-[#322F2C] hover:border-[#D05A1E]/40 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 rounded-xl shadow-sm overflow-hidden"
                           >
                             <CardContent className="p-4 space-y-3 relative">
                               
@@ -426,7 +426,7 @@ export default function CampaignsPage() {
                                   <button className="flex items-center gap-1 text-[10px] font-bold text-neutral-500 hover:text-[#D05A1E] bg-neutral-100 hover:bg-[#D05A1E]/10 px-2 py-0.5 rounded transition-all">
                                     Stage <ChevronDown className="h-3 w-3" />
                                   </button>
-                                  <div className="absolute right-0 top-full mt-1 hidden group-hover/menu:block bg-white dark:bg-[#2A1D16] border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl z-20 py-1.5 w-36 animate-in fade-in slide-in-from-top-1 duration-200">
+                                  <div className="absolute right-0 top-full mt-1 hidden group-hover/menu:block bg-white dark:bg-[#322F2C] border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl z-20 py-1.5 w-36 animate-in fade-in slide-in-from-top-1 duration-200">
                                     <p className="text-[9px] font-bold text-neutral-400 px-3 pb-1 border-b border-neutral-100 dark:border-neutral-800 mb-1">Pindahkan Stage:</p>
                                     {displayStages.map(s => {
                                       const isCurrent = c.stage_id ? c.stage_id[0] === s.id : (stage.id === s.id);
@@ -448,7 +448,7 @@ export default function CampaignsPage() {
 
                               {/* Title */}
                               <div>
-                                <h4 className="font-extrabold text-[#3b1a08] dark:text-white text-sm group-hover:text-[#D05A1E] transition-colors line-clamp-2 leading-snug">
+                                <h4 className="font-extrabold text-[#4C382D] dark:text-white text-sm group-hover:text-[#D05A1E] transition-colors line-clamp-2 leading-snug">
                                   {c.title}
                                 </h4>
                                 <p className="text-[10px] text-neutral-400 mt-0.5 line-clamp-1 font-mono font-medium">
@@ -483,7 +483,7 @@ export default function CampaignsPage() {
                               <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between">
                                 <div className="space-y-1.5">
                                   {/* Invoiced Amount */}
-                                  <div className="text-xs font-black text-[#3b1a08] dark:text-white flex items-center gap-0.5">
+                                  <div className="text-xs font-black text-[#4C382D] dark:text-white flex items-center gap-0.5">
                                     <span>{formatIDR(c.invoiced_amount)}</span>
                                   </div>
                                   
@@ -527,10 +527,10 @@ export default function CampaignsPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 p-4">
             <form 
               onSubmit={handleSubmit}
-              className="bg-white dark:bg-[#251812] w-full max-w-md p-6 rounded-2xl shadow-2xl border border-[#D05A1E]/20 space-y-4 text-left animate-in zoom-in-95 duration-200"
+              className="bg-white dark:bg-[#322F2C] w-full max-w-md p-6 rounded-2xl shadow-2xl border border-[#D05A1E]/20 space-y-4 text-left animate-in zoom-in-95 duration-200"
             >
               <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800/80 pb-3">
-                <h2 className="text-lg font-bold flex items-center gap-2 text-[#3b1a08] dark:text-white">
+                <h2 className="text-lg font-bold flex items-center gap-2 text-[#4C382D] dark:text-white">
                   <span className="p-1 bg-[#D05A1E]/10 rounded-lg">
                     <Target className="h-5 w-5 text-[#D05A1E]" />
                   </span>
@@ -568,7 +568,7 @@ export default function CampaignsPage() {
                   placeholder="Contoh: Kemitraan Kafe Jabodetabek 2026"
                   value={newCampaignTitle}
                   onChange={(e) => handleTitleChange(e.target.value)}
-                  className="bg-white dark:bg-[#1E140F] border-border rounded-xl focus-visible:ring-[#D05A1E]"
+                  className="bg-white dark:bg-[#23201E] border-border rounded-xl focus-visible:ring-[#D05A1E]"
                   required
                 />
               </div>
@@ -581,7 +581,7 @@ export default function CampaignsPage() {
                   placeholder="Contoh: kemitraan_kafe_jabodetabek_2026"
                   value={newCampaignName}
                   onChange={(e) => setNewCampaignName(e.target.value)}
-                  className="bg-white dark:bg-[#1E140F] border-border rounded-xl font-mono text-xs focus-visible:ring-[#D05A1E]"
+                  className="bg-white dark:bg-[#23201E] border-border rounded-xl font-mono text-xs focus-visible:ring-[#D05A1E]"
                   required
                 />
                 <p className="text-[10px] text-muted-foreground leading-relaxed">

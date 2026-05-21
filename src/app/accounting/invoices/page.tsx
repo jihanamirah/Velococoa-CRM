@@ -248,7 +248,7 @@ export default function InvoicesPage() {
         {/* Header */}
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-[#3b1a08] dark:text-white flex items-center gap-2">
+            <h2 className="text-3xl font-bold tracking-tight text-[#4C382D] dark:text-white flex items-center gap-2">
               <Receipt className="h-8 w-8 text-indigo-600 animate-pulse" /> Faktur Penjualan (Invoices)
             </h2>
             <p className="text-muted-foreground text-sm">
@@ -264,11 +264,11 @@ export default function InvoicesPage() {
         </div>
 
         {/* Invoice Table Card */}
-        <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden">
+        <Card className="border-none shadow-lg bg-white dark:bg-[#322F2C] rounded-2xl overflow-hidden">
           <CardHeader className="pb-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <CardTitle className="text-xl font-bold text-[#3b1a08] dark:text-white flex items-center gap-1.5">
+                <CardTitle className="text-xl font-bold text-[#4C382D] dark:text-white flex items-center gap-1.5">
                   <FileSpreadsheet className="h-5 w-5 text-indigo-500" /> Daftar Faktur Penjualan PT VeloCocoa
                 </CardTitle>
                 <CardDescription>Menampilkan daftar tagihan penjualan berlabel VeloCocoa di Odoo ERP.</CardDescription>
@@ -295,7 +295,7 @@ export default function InvoicesPage() {
             ) : filteredInvoices.length === 0 ? (
               <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-2">
                 <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
-                <span className="font-semibold text-[#3b1a08] dark:text-white">Tidak ada invoice ditemukan</span>
+                <span className="font-semibold text-[#4C382D] dark:text-white">Tidak ada invoice ditemukan</span>
                 <span className="text-xs">Ubah filter pencarian atau buat invoice baru.</span>
               </div>
             ) : (
@@ -319,7 +319,7 @@ export default function InvoicesPage() {
                         <td className="px-6 py-4 font-bold text-indigo-600 max-w-xs truncate flex items-center gap-1.5">
                           <FileSpreadsheet className="h-4 w-4 text-indigo-400" /> {inv.name}
                         </td>
-                        <td className="px-6 py-4 font-semibold text-[#3b1a08] dark:text-white max-w-xs truncate">
+                        <td className="px-6 py-4 font-semibold text-[#4C382D] dark:text-white max-w-xs truncate">
                           {inv.partnerName}
                         </td>
                         <td className="px-6 py-4 text-center text-muted-foreground text-xs font-medium">
@@ -328,7 +328,7 @@ export default function InvoicesPage() {
                         <td className="px-6 py-4 text-center text-muted-foreground text-xs font-medium">
                           {inv.invoiceDateDue || "-"}
                         </td>
-                        <td className="px-6 py-4 text-right font-bold text-[#3b1a08] dark:text-white">
+                        <td className="px-6 py-4 text-right font-bold text-[#4C382D] dark:text-white">
                           {formatRupiah(inv.amountTotal)}
                         </td>
                         <td className="px-6 py-4 text-center">

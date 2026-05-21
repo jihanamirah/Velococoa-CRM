@@ -17,7 +17,7 @@ export default function SplashScreen() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-[#3B1A08] flex flex-col items-center justify-center animate-in fade-in duration-1000">
+    <div className="min-h-screen bg-[#4C382D] flex flex-col items-center justify-center animate-in fade-in duration-1000">
       <div className="relative">
         <div className="text-5xl font-bold tracking-tighter text-[#C17B3A] mb-4">
           VeloCocoa

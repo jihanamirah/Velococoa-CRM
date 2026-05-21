@@ -128,11 +128,11 @@ export default function MailingsPage() {
     
     if (templateKey === "CAFE") {
       body = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
-        <h2 style="color: #3b1a08; border-bottom: 2px solid #D05A1E; padding-bottom: 10px; font-weight: bold;">Penawaran Cokelat Premium Spesial Kafe</h2>
+        <h2 style="color: #4C382D; border-bottom: 2px solid #D05A1E; padding-bottom: 10px; font-weight: bold;">Penawaran Cokelat Premium Spesial Kafe</h2>
         <p style="font-size: 14px; color: #4a5568; line-height: 1.6;">Dear Owner/Manager Café,</p>
         <p style="font-size: 14px; color: #4a5568; line-height: 1.6;">Kami dari <b>PT VeloCocoa Indonesia</b> menawarkan kerja sama pasokan bahan baku cokelat premium artisanal untuk memperkaya menu minuman dan dessert di kafe Anda.</p>
         <div style="background-color: #f7fafc; border-left: 4px solid #D05A1E; padding: 15px; margin: 20px 0; border-radius: 4px;">
-          <h4 style="margin: 0 0 8px 0; color: #3b1a08; font-size: 15px;">Daftar Produk Unggulan Kafe:</h4>
+          <h4 style="margin: 0 0 8px 0; color: #4C382D; font-size: 15px;">Daftar Produk Unggulan Kafe:</h4>
           <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #4a5568; line-height: 1.5;">
             <li><b>Chocolate Couverture Buttons</b> - Meleleh sempurna untuk hot chocolate</li>
             <li><b>Artisanal Cocoa Powder 100%</b> - Aroma murni chocolatey premium</li>
@@ -144,11 +144,11 @@ export default function MailingsPage() {
       </div>`;
     } else if (templateKey === "HOTEL") {
       body = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
-        <h2 style="color: #3b1a08; border-bottom: 2px solid #D05A1E; padding-bottom: 10px; font-weight: bold;">Kerja Sama Banquet & Hotel Supplies</h2>
+        <h2 style="color: #4C382D; border-bottom: 2px solid #D05A1E; padding-bottom: 10px; font-weight: bold;">Kerja Sama Banquet & Hotel Supplies</h2>
         <p style="font-size: 14px; color: #4a5568; line-height: 1.6;">Kepada Yth.<br><b>Purchasing Manager / F&B Director Hotel</b></p>
         <p style="font-size: 14px; color: #4a5568; line-height: 1.6;">VeloCocoa menghadirkan produk cokelat banquet berkualitas tinggi dengan rasa otentik khas artisanal untuk kebutuhan hidangan tamu hotel Anda. Kami siap mensuplai cokelat premium custom dengan standard sertifikasi internasional.</p>
         <div style="background-color: #f7fafc; border-left: 4px solid #D05A1E; padding: 15px; margin: 20px 0; border-radius: 4px;">
-          <h4 style="margin: 0 0 8px 0; color: #3b1a08; font-size: 15px;">Keuntungan Bermitra dengan VeloCocoa:</h4>
+          <h4 style="margin: 0 0 8px 0; color: #4C382D; font-size: 15px;">Keuntungan Bermitra dengan VeloCocoa:</h4>
           <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #4a5568; line-height: 1.5;">
             <li>Sertifikasi Halal & BPOM Lengkap</li>
             <li>Kapasitas produksi skala besar dengan jadwal kirim terjamin</li>
@@ -160,11 +160,11 @@ export default function MailingsPage() {
       </div>`;
     } else if (templateKey === "BAKERY") {
       body = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
-        <h2 style="color: #3b1a08; border-bottom: 2px solid #D05A1E; padding-bottom: 10px; font-weight: bold;">Tingkatkan Kualitas Roti & Cake Anda</h2>
+        <h2 style="color: #4C382D; border-bottom: 2px solid #D05A1E; padding-bottom: 10px; font-weight: bold;">Tingkatkan Kualitas Roti & Cake Anda</h2>
         <p style="font-size: 14px; color: #4a5568; line-height: 1.6;">Halo Rekan Bakery,</p>
         <p style="font-size: 14px; color: #4a5568; line-height: 1.6;">Tingkatkan kualitas cake, cookies, dan pastry Anda menggunakan chocolate chunks dan cocoa powder murni beraroma premium dari VeloCocoa.</p>
         <div style="background-color: #f7fafc; border-left: 4px solid #D05A1E; padding: 15px; margin: 20px 0; border-radius: 4px;">
-          <h4 style="margin: 0 0 8px 0; color: #3b1a08; font-size: 15px;">Chocolate Supplies Terpopuler:</h4>
+          <h4 style="margin: 0 0 8px 0; color: #4C382D; font-size: 15px;">Chocolate Supplies Terpopuler:</h4>
           <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #4a5568; line-height: 1.5;">
             <li><b>Bake-Stable Chocolate Chips</b> - Tidak lumer saat dipanggang di oven</li>
             <li><b>Dark Chocolate Block 58% & 72%</b> - Ideal untuk filling dan ganache</li>
@@ -243,7 +243,7 @@ export default function MailingsPage() {
         {/* Header */}
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-[#3b1a08] dark:text-white flex items-center gap-2">
+            <h2 className="text-3xl font-bold tracking-tight text-[#4C382D] dark:text-white flex items-center gap-2">
               <MailOpen className="h-8 w-8 text-[#D05A1E] animate-pulse" /> Mailing Broadcast
             </h2>
             <p className="text-muted-foreground text-sm">
@@ -265,7 +265,7 @@ export default function MailingsPage() {
         {/* Mini Stats Grid */}
         {!isLoading && (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card className="border-none shadow bg-white dark:bg-[#2A1D16] p-4 flex flex-row items-center gap-3">
+            <Card className="border-none shadow bg-white dark:bg-[#322F2C] p-4 flex flex-row items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center font-bold">
                 <Megaphone className="h-5 w-5" />
               </div>
@@ -274,7 +274,7 @@ export default function MailingsPage() {
                 <span className="text-lg font-black">{totalCampaigns} Broadcast</span>
               </div>
             </Card>
-            <Card className="border-none shadow bg-white dark:bg-[#2A1D16] p-4 flex flex-row items-center gap-3">
+            <Card className="border-none shadow bg-white dark:bg-[#322F2C] p-4 flex flex-row items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold">
                 <Send className="h-5 w-5" />
               </div>
@@ -283,7 +283,7 @@ export default function MailingsPage() {
                 <span className="text-lg font-black">{totalSent} Peneriman</span>
               </div>
             </Card>
-            <Card className="border-none shadow bg-white dark:bg-[#2A1D16] p-4 flex flex-row items-center gap-3">
+            <Card className="border-none shadow bg-white dark:bg-[#322F2C] p-4 flex flex-row items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
                 <MailOpen className="h-5 w-5" />
               </div>
@@ -292,7 +292,7 @@ export default function MailingsPage() {
                 <span className="text-lg font-black text-amber-500">{avgOpenRate}%</span>
               </div>
             </Card>
-            <Card className="border-none shadow bg-white dark:bg-[#2A1D16] p-4 flex flex-row items-center gap-3">
+            <Card className="border-none shadow bg-white dark:bg-[#322F2C] p-4 flex flex-row items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold">
                 <MousePointerClick className="h-5 w-5" />
               </div>
@@ -305,11 +305,11 @@ export default function MailingsPage() {
         )}
 
         {/* Campaign Table Card */}
-        <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden">
+        <Card className="border-none shadow-lg bg-white dark:bg-[#322F2C] rounded-2xl overflow-hidden">
           <CardHeader className="pb-4">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
-                <CardTitle className="text-xl font-bold text-[#3b1a08] dark:text-white">Daftar Mailing Broadcast</CardTitle>
+                <CardTitle className="text-xl font-bold text-[#4C382D] dark:text-white">Daftar Mailing Broadcast</CardTitle>
                 <CardDescription>Menampilkan log pengiriman dari modul Odoo mass.mailing.</CardDescription>
               </div>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:max-w-2xl justify-end">
@@ -360,7 +360,7 @@ export default function MailingsPage() {
             ) : filteredMailings.length === 0 ? (
               <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-2">
                 <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
-                <span className="font-semibold text-[#3b1a08] dark:text-white">Tidak ada email ditemukan</span>
+                <span className="font-semibold text-[#4C382D] dark:text-white">Tidak ada email ditemukan</span>
                 <span className="text-xs">Ubah filter pencarian atau buat email baru.</span>
               </div>
             ) : (
@@ -385,7 +385,7 @@ export default function MailingsPage() {
                       return (
                         <tr key={m.id} className="hover:bg-muted/20 transition-colors">
                           <td className="px-6 py-4 max-w-xs">
-                            <div className="font-bold text-[#3b1a08] dark:text-white truncate">{m.subject}</div>
+                            <div className="font-bold text-[#4C382D] dark:text-white truncate">{m.subject}</div>
                             <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1 font-semibold">
                               <span>Pembuat:</span>
                               <span className="text-neutral-600 dark:text-neutral-400 font-bold">{m.userId ? m.userId[1] : 'OdooBot'}</span>
@@ -422,7 +422,7 @@ export default function MailingsPage() {
                               </span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-center font-semibold text-[#3b1a08] dark:text-white">
+                          <td className="px-6 py-4 text-center font-semibold text-[#4C382D] dark:text-white">
                             {m.sent}
                           </td>
                           <td className="px-6 py-4 text-center">
@@ -598,7 +598,7 @@ export default function MailingsPage() {
               <div className="grid grid-cols-2 gap-4 p-4 bg-muted/20 border border-primary/10 rounded-xl text-xs text-muted-foreground">
                 <div>
                   <span className="block font-semibold">Subjek:</span>
-                  <span className="text-[#3b1a08] dark:text-white font-bold text-sm">{selectedMailing.subject}</span>
+                  <span className="text-[#4C382D] dark:text-white font-bold text-sm">{selectedMailing.subject}</span>
                 </div>
                 <div>
                   <span className="block font-semibold">Kampanye UTM:</span>
@@ -612,7 +612,7 @@ export default function MailingsPage() {
                 </div>
                 <div>
                   <span className="block font-semibold">Penerima Sukses:</span>
-                  <span className="font-bold text-sm text-[#3b1a08] dark:text-white">{selectedMailing.sent} Email</span>
+                  <span className="font-bold text-sm text-[#4C382D] dark:text-white">{selectedMailing.sent} Email</span>
                 </div>
               </div>
 

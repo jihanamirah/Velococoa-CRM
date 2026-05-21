@@ -120,7 +120,7 @@ export default function AccountingDashboardPage() {
         {/* Header */}
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-[#3b1a08] dark:text-white flex items-center gap-2">
+            <h2 className="text-3xl font-bold tracking-tight text-[#4C382D] dark:text-white flex items-center gap-2">
               <Wallet className="h-8 w-8 text-indigo-600 animate-bounce" /> Accounting Dashboard
             </h2>
             <p className="text-muted-foreground text-sm">
@@ -140,7 +140,7 @@ export default function AccountingDashboardPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             
             {/* Card 1: Total Receivables */}
-            <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+            <Card className="border-none shadow-lg bg-white dark:bg-[#322F2C] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
               <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 blur-2xl rounded-full" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Total Piutang</CardTitle>
@@ -155,7 +155,7 @@ export default function AccountingDashboardPage() {
             </Card>
 
             {/* Card 2: Total Invoices Count */}
-            <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+            <Card className="border-none shadow-lg bg-white dark:bg-[#322F2C] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
               <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 blur-2xl rounded-full" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Faktur Terbit</CardTitle>
@@ -164,13 +164,13 @@ export default function AccountingDashboardPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-[#3b1a08] dark:text-white">{totalInvoicesCount}</div>
+                <div className="text-2xl font-bold text-[#4C382D] dark:text-white">{totalInvoicesCount}</div>
                 <p className="text-xs text-muted-foreground mt-1">Total Faktur Customer Odoo</p>
               </CardContent>
             </Card>
 
             {/* Card 3: Collection Rate */}
-            <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+            <Card className="border-none shadow-lg bg-white dark:bg-[#322F2C] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
               <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 blur-2xl rounded-full" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Rasio Lunas</CardTitle>
@@ -185,7 +185,7 @@ export default function AccountingDashboardPage() {
             </Card>
 
             {/* Card 4: Net Revenue Collected */}
-            <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+            <Card className="border-none shadow-lg bg-white dark:bg-[#322F2C] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
               <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 blur-2xl rounded-full" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Kas Masuk</CardTitle>
@@ -206,10 +206,10 @@ export default function AccountingDashboardPage() {
         <div className="grid gap-6 md:grid-cols-2">
           
           {/* Box 1: Faktur Penjualan Shortcut */}
-          <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden hover:scale-[1.01] transition-transform duration-300 flex flex-col justify-between">
+          <Card className="border-none shadow-lg bg-white dark:bg-[#322F2C] rounded-2xl overflow-hidden hover:scale-[1.01] transition-transform duration-300 flex flex-col justify-between">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-xl font-bold text-[#3b1a08] dark:text-white flex items-center gap-2">
+                <CardTitle className="text-xl font-bold text-[#4C382D] dark:text-white flex items-center gap-2">
                   <Receipt className="h-6 w-6 text-indigo-600" /> Modul Faktur Penjualan (Invoices)
                 </CardTitle>
                 <span className="text-xs bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300 px-3 py-1 rounded-full font-bold">
@@ -252,10 +252,10 @@ export default function AccountingDashboardPage() {
           </Card>
 
           {/* Box 2: Journal Entries Shortcut */}
-          <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden hover:scale-[1.01] transition-transform duration-300 flex flex-col justify-between">
+          <Card className="border-none shadow-lg bg-white dark:bg-[#322F2C] rounded-2xl overflow-hidden hover:scale-[1.01] transition-transform duration-300 flex flex-col justify-between">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-xl font-bold text-[#3b1a08] dark:text-white flex items-center gap-2">
+                <CardTitle className="text-xl font-bold text-[#4C382D] dark:text-white flex items-center gap-2">
                   <BookOpen className="h-6 w-6 text-slate-600" /> Modul Journal Entries (Jurnal)
                 </CardTitle>
                 <span className="text-xs bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-300 px-3 py-1 rounded-full font-bold">

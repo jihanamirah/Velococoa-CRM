@@ -107,7 +107,7 @@ export default function MarketingPage() {
         {/* Header */}
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-[#3b1a08] dark:text-white flex items-center gap-2">
+            <h2 className="text-3xl font-bold tracking-tight text-[#4C382D] dark:text-white flex items-center gap-2">
               <Megaphone className="h-8 w-8 text-[#D05A1E] animate-pulse" /> Marketing Dashboard
             </h2>
             <p className="text-muted-foreground text-sm">
@@ -127,7 +127,7 @@ export default function MarketingPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             
             {/* Card 1: Total Campaigns */}
-            <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+            <Card className="border-none shadow-md bg-white dark:bg-[#322F2C] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
               <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 blur-2xl rounded-full" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Total Kampanye</CardTitle>
@@ -136,13 +136,13 @@ export default function MarketingPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-[#3b1a08] dark:text-white">{totalCampaigns}</div>
+                <div className="text-2xl font-bold text-[#4C382D] dark:text-white">{totalCampaigns}</div>
                 <p className="text-xs text-muted-foreground mt-1">Broadcast VeloCocoa di Odoo</p>
               </CardContent>
             </Card>
 
             {/* Card 2: Total Sent */}
-            <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+            <Card className="border-none shadow-md bg-white dark:bg-[#322F2C] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
               <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 blur-2xl rounded-full" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Email Terkirim</CardTitle>
@@ -151,13 +151,13 @@ export default function MarketingPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-[#3b1a08] dark:text-white">{totalSent}</div>
+                <div className="text-2xl font-bold text-[#4C382D] dark:text-white">{totalSent}</div>
                 <p className="text-xs text-muted-foreground mt-1">Total Broadcast Sukses</p>
               </CardContent>
             </Card>
 
             {/* Card 3: Open Rate */}
-            <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+            <Card className="border-none shadow-md bg-white dark:bg-[#322F2C] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
               <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 blur-2xl rounded-full" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Rata-rata Terbuka</CardTitle>
@@ -172,7 +172,7 @@ export default function MarketingPage() {
             </Card>
 
             {/* Card 4: Click Rate */}
-            <Card className="border-none shadow-md bg-white dark:bg-[#2A1D16] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+            <Card className="border-none shadow-md bg-white dark:bg-[#322F2C] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
               <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-2xl rounded-full" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Rata-rata Klik</CardTitle>
@@ -193,9 +193,9 @@ export default function MarketingPage() {
           
           {/* UTM Campaigns List Widget */}
           <div className="lg:col-span-2 space-y-6">
-            <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden">
+            <Card className="border-none shadow-lg bg-white dark:bg-[#322F2C] rounded-2xl overflow-hidden">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-bold text-[#3b1a08] dark:text-white flex items-center gap-1.5">
+                <CardTitle className="text-lg font-bold text-[#4C382D] dark:text-white flex items-center gap-1.5">
                   <Award className="h-5 w-5 text-[#D05A1E]" /> Induk Kampanye UTM Pemasaran (Odoo)
                 </CardTitle>
                 <CardDescription className="text-xs">
@@ -217,7 +217,7 @@ export default function MarketingPage() {
                     {utmCampaigns.map(utm => (
                       <div key={utm.id} className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors">
                         <div>
-                          <span className="block font-bold text-sm text-[#3b1a08] dark:text-white">{utm.title}</span>
+                          <span className="block font-bold text-sm text-[#4C382D] dark:text-white">{utm.title}</span>
                           <span className="text-xs text-muted-foreground font-mono">Kode UTM: {utm.name}</span>
                         </div>
                         <span className="bg-[#D05A1E]/10 text-[#D05A1E] text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded">
@@ -233,10 +233,10 @@ export default function MarketingPage() {
 
           {/* Quick Navigator Widget */}
           <div className="lg:col-span-1 space-y-6">
-            <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden relative">
+            <Card className="border-none shadow-lg bg-white dark:bg-[#322F2C] rounded-2xl overflow-hidden relative">
               <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full" />
               <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-bold text-[#3b1a08] dark:text-white flex items-center gap-1.5">
+                <CardTitle className="text-lg font-bold text-[#4C382D] dark:text-white flex items-center gap-1.5">
                   <Sparkles className="h-5 w-5 text-[#D05A1E]" /> Pintasan Pemasaran
                 </CardTitle>
                 <CardDescription className="text-xs">Akses cepat menu fungsional promosi.</CardDescription>

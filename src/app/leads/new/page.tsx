@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { 
   ArrowLeft, 
   Save, 
@@ -94,6 +95,52 @@ export default function NewLeadPage() {
                 <div className="space-y-2">
                   <Label htmlFor="kota">Kota <span className="text-destructive">*</span></Label>
                   <Input id="kota" name="kota" placeholder="Contoh: Jakarta Selatan" required className="bg-background/50" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-none shadow-xl bg-card/40 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle>Estimasi Penjualan</CardTitle>
+                <CardDescription>Target pendapatan, probabilitas closing, dan tanggal penutupan lead.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="expectedRevenue">Expected Revenue (Rp)</Label>
+                    <Input 
+                      id="expectedRevenue" 
+                      name="expectedRevenue" 
+                      type="number" 
+                      placeholder="Contoh: 15000000" 
+                      className="bg-background/50" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="probability" className="flex items-center gap-1.5">
+                      Probability (%)
+                      <Badge className="bg-amber-500/15 text-amber-600 hover:bg-amber-500/20 text-[9px] px-1 py-0.5 border-none font-bold uppercase tracking-wider">AI</Badge>
+                    </Label>
+                    <Input 
+                      id="probability" 
+                      name="probability" 
+                      type="number" 
+                      min="0" 
+                      max="100" 
+                      placeholder="0 - 100" 
+                      className="bg-background/50" 
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="dateDeadline">Expected Closing Date</Label>
+                  <Input 
+                    id="dateDeadline" 
+                    name="dateDeadline" 
+                    type="date" 
+                    className="bg-background/50 font-sans" 
+                  />
                 </div>
               </CardContent>
             </Card>

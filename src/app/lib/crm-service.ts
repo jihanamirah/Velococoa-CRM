@@ -27,10 +27,27 @@ import {
   getOdooMailingContacts,
   createOdooMailingContact,
   createOdooUtmCampaign,
+  createOdooUtmMedium,
+  createOdooUtmSource,
   getOdooProducts,
   payOdooInvoice,
   postOdooInvoice,
-  updateOdooUtmCampaignStage
+  updateOdooUtmCampaignStage,
+  getOdooUtmMediums,
+  getOdooUtmSources,
+  getOdooCountries,
+  getOdooStates,
+  getOdooSalesTeams,
+  findOrCreateUtmRecord,
+  getOdooQuotations,
+  getOdooQuotationById,
+  getOdooQuotationLines,
+  createOdooQuotation,
+  updateOdooQuotation,
+  confirmOdooQuotation,
+  cancelOdooQuotation,
+  getOdooPaymentTerms,
+  createOdooContact
 } from '@/services/odoo';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -73,6 +90,19 @@ export interface Lead {
   sourceId?: number;
   sourceName?: string;
   referred?: string;
+  street?: string;
+  street2?: string;
+  zip?: string;
+  stateId?: number;
+  stateName?: string;
+  countryId?: number;
+  countryName?: string;
+  jobPosition?: string;
+  website?: string;
+  salesTeamId?: number;
+  salesTeamName?: string;
+  expectedRevenue?: number;
+  dateDeadline?: string;
 }
 
 function cleanDescription(desc: string): string {
@@ -182,7 +212,20 @@ function mapOdooToLead(odoo: any): Lead {
     mediumName: Array.isArray(odoo.medium_id) ? String(odoo.medium_id[1]) : undefined,
     sourceId: Array.isArray(odoo.source_id) ? Number(odoo.source_id[0]) : undefined,
     sourceName: Array.isArray(odoo.source_id) ? String(odoo.source_id[1]) : undefined,
-    referred: odoo.referred ? String(odoo.referred) : undefined
+    referred: odoo.referred ? String(odoo.referred) : undefined,
+    street: odoo.street ? String(odoo.street) : undefined,
+    street2: odoo.street2 ? String(odoo.street2) : undefined,
+    zip: odoo.zip ? String(odoo.zip) : undefined,
+    stateId: Array.isArray(odoo.state_id) ? Number(odoo.state_id[0]) : undefined,
+    stateName: Array.isArray(odoo.state_id) ? String(odoo.state_id[1]) : undefined,
+    countryId: Array.isArray(odoo.country_id) ? Number(odoo.country_id[0]) : undefined,
+    countryName: Array.isArray(odoo.country_id) ? String(odoo.country_id[1]) : undefined,
+    jobPosition: odoo.function ? String(odoo.function) : undefined,
+    website: odoo.website ? String(odoo.website) : undefined,
+    salesTeamId: Array.isArray(odoo.team_id) ? Number(odoo.team_id[0]) : undefined,
+    salesTeamName: Array.isArray(odoo.team_id) ? String(odoo.team_id[1]) : undefined,
+    expectedRevenue: Number(odoo.expected_revenue || 0),
+    dateDeadline: odoo.date_deadline && odoo.date_deadline !== false ? String(odoo.date_deadline) : undefined
   };
 }
 
@@ -304,6 +347,9 @@ export async function createLead(input: any): Promise<any> {
         sumber: input.sumber || "Langsung",
         sudahSyncOdoo: true,
         odooLeadId: String(odooRes.id),
+        expectedRevenue: input.expectedRevenue !== undefined ? (parseFloat(input.expectedRevenue) || 0) : 0,
+        probability: input.probability !== undefined ? (parseFloat(input.probability) || 0) : 0,
+        dateDeadline: input.dateDeadline || "",
         createdAt: new Date(),
         updatedAt: new Date()
       });
@@ -355,6 +401,29 @@ export async function updateLeadDetails(leadId: string, updates: Partial<Lead>):
     if (updates.kategoriBisnis !== undefined) fsUpdates.kategoriBisnis = updates.kategoriBisnis;
     if (updates.catatan !== undefined) fsUpdates.catatan = updates.catatan;
     if (updates.catatanInternal !== undefined) fsUpdates.catatanInternal = updates.catatanInternal;
+    if (updates.street !== undefined) fsUpdates.street = updates.street;
+    if (updates.street2 !== undefined) fsUpdates.street2 = updates.street2;
+    if (updates.zip !== undefined) fsUpdates.zip = updates.zip;
+    if (updates.stateId !== undefined) fsUpdates.stateId = updates.stateId;
+    if (updates.stateName !== undefined) fsUpdates.stateName = updates.stateName;
+    if (updates.countryId !== undefined) fsUpdates.countryId = updates.countryId;
+    if (updates.countryName !== undefined) fsUpdates.countryName = updates.countryName;
+    if (updates.jobPosition !== undefined) fsUpdates.jobPosition = updates.jobPosition;
+    if (updates.website !== undefined) fsUpdates.website = updates.website;
+    if (updates.salesTeamId !== undefined) fsUpdates.salesTeamId = updates.salesTeamId;
+    if (updates.salesTeamName !== undefined) fsUpdates.salesTeamName = updates.salesTeamName;
+    if (updates.campaignId !== undefined) fsUpdates.campaignId = updates.campaignId;
+    if (updates.campaignName !== undefined) fsUpdates.campaignName = updates.campaignName;
+    if (updates.mediumId !== undefined) fsUpdates.mediumId = updates.mediumId;
+    if (updates.mediumName !== undefined) fsUpdates.mediumName = updates.mediumName;
+    if (updates.sourceId !== undefined) fsUpdates.sourceId = updates.sourceId;
+    if (updates.sourceName !== undefined) fsUpdates.sourceName = updates.sourceName;
+    if (updates.referred !== undefined) fsUpdates.referred = updates.referred;
+    if (updates.promoMinat !== undefined) fsUpdates.promoMinat = updates.promoMinat;
+    if (updates.estimasiVolume !== undefined) fsUpdates.estimasiVolume = updates.estimasiVolume;
+    if (updates.expectedRevenue !== undefined) fsUpdates.expectedRevenue = updates.expectedRevenue;
+    if (updates.probability !== undefined) fsUpdates.probability = updates.probability;
+    if (updates.dateDeadline !== undefined) fsUpdates.dateDeadline = updates.dateDeadline;
 
     if (!querySnapshot.empty) {
       const docId = querySnapshot.docs[0].id;
@@ -634,6 +703,14 @@ export async function createUtmCampaign(title: string, name: string) {
   return await createOdooUtmCampaign(title, name);
 }
 
+export async function createUtmMedium(name: string) {
+  return await createOdooUtmMedium(name);
+}
+
+export async function createUtmSource(name: string) {
+  return await createOdooUtmSource(name);
+}
+
 export async function payInvoice(invoiceId: number, amount: number, paymentDate: string, journalType: 'bank' | 'cash') {
   return await payOdooInvoice(invoiceId, amount, paymentDate, journalType);
 }
@@ -642,4 +719,132 @@ export async function postInvoice(invoiceId: number) {
   return await postOdooInvoice(invoiceId);
 }
 
+export async function getMediums() {
+  return await getOdooUtmMediums();
+}
+
+export async function getSources() {
+  return await getOdooUtmSources();
+}
+
+export async function getCountries() {
+  return await getOdooCountries();
+}
+
+export async function getStates(countryId?: number) {
+  return await getOdooStates(countryId);
+}
+
+export async function getSalesTeams() {
+  return await getOdooSalesTeams();
+}
+
+export async function findOrCreateUtm(model: 'utm.campaign' | 'utm.medium' | 'utm.source', name: string) {
+  return await findOrCreateUtmRecord(model, name);
+}
+
+export interface QuotationLine {
+  id: string;
+  productId: number;
+  productName: string;
+  name: string;
+  quantity: number;
+  priceUnit: number;
+  priceSubtotal: number;
+}
+
+export interface Quotation {
+  id: string;
+  name: string;
+  partnerId: number;
+  partnerName: string;
+  validityDate: string;
+  paymentTermId?: number;
+  paymentTermName?: string;
+  amountUntaxed: number;
+  amountTax: number;
+  amountTotal: number;
+  state: 'draft' | 'sent' | 'sale' | 'cancel';
+  opportunityId?: number;
+  opportunityName?: string;
+  orderLineIds: number[];
+}
+
+function mapOdooToQuotation(odoo: any): Quotation {
+  const partnerData = Array.isArray(odoo.partner_id) ? odoo.partner_id : [0, 'Mitra Umum'];
+  const oppData = Array.isArray(odoo.opportunity_id) ? odoo.opportunity_id : undefined;
+  const termData = Array.isArray(odoo.payment_term_id) ? odoo.payment_term_id : undefined;
+
+  return {
+    id: String(odoo.id),
+    name: String(odoo.name || 'DRAFT'),
+    partnerId: Number(partnerData[0]),
+    partnerName: String(partnerData[1]),
+    validityDate: odoo.validity_date && odoo.validity_date !== false ? String(odoo.validity_date) : '',
+    paymentTermId: termData ? Number(termData[0]) : undefined,
+    paymentTermName: termData ? String(termData[1]) : undefined,
+    amountUntaxed: Number(odoo.amount_untaxed || 0),
+    amountTax: Number(odoo.amount_tax || 0),
+    amountTotal: Number(odoo.amount_total || 0),
+    state: (odoo.state || 'draft') as 'draft' | 'sent' | 'sale' | 'cancel',
+    opportunityId: oppData ? Number(oppData[0]) : undefined,
+    opportunityName: oppData ? String(oppData[1]) : undefined,
+    orderLineIds: Array.isArray(odoo.order_line) ? odoo.order_line.map(Number) : []
+  };
+}
+
+export async function getQuotations(leadId?: string): Promise<Quotation[]> {
+  const oppId = leadId ? parseInt(leadId, 10) : undefined;
+  const odooQuotes = await getOdooQuotations(oppId);
+  return odooQuotes.map(mapOdooToQuotation);
+}
+
+export async function getQuotationById(id: string): Promise<Quotation | null> {
+  const odooQuote = await getOdooQuotationById(parseInt(id, 10));
+  return odooQuote ? mapOdooToQuotation(odooQuote) : null;
+}
+
+export async function getQuotationLines(lineIds: number[]): Promise<QuotationLine[]> {
+  const odooLines = await getOdooQuotationLines(lineIds);
+  return odooLines.map((line: any) => {
+    const prodData = Array.isArray(line.product_id) ? line.product_id : [0, 'Classic Chocolate'];
+    return {
+      id: String(line.id),
+      productId: Number(prodData[0]),
+      productName: String(prodData[1]),
+      name: String(line.name || ''),
+      quantity: Number(line.product_uom_qty || 0),
+      priceUnit: Number(line.price_unit || 0),
+      priceSubtotal: Number(line.price_subtotal || 0)
+    };
+  });
+}
+
+export async function createQuotation(data: any) {
+  return await createOdooQuotation(data);
+}
+
+export async function updateQuotation(id: string, data: any) {
+  return await updateOdooQuotation(parseInt(id, 10), data);
+}
+
+export async function confirmQuotation(id: string) {
+  return await confirmOdooQuotation(parseInt(id, 10));
+}
+
+export async function cancelQuotation(id: string) {
+  return await cancelOdooQuotation(parseInt(id, 10));
+}
+
+export async function getPaymentTerms() {
+  const rawTerms = await getOdooPaymentTerms();
+  return rawTerms.map((t: any) => ({
+    id: t.id,
+    name: t.name
+  }));
+}
+
+export async function createContact(name: string, email?: string, phone?: string) {
+  return await createOdooContact(name, email, phone);
+}
 

@@ -78,7 +78,7 @@ export default function JournalsPage() {
         {/* Header */}
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-[#3b1a08] dark:text-white flex items-center gap-2">
+            <h2 className="text-3xl font-bold tracking-tight text-[#4C382D] dark:text-white flex items-center gap-2">
               <BookOpen className="h-8 w-8 text-slate-600 animate-bounce" /> Journal Entries (Jurnal)
             </h2>
             <p className="text-muted-foreground text-sm">
@@ -88,11 +88,11 @@ export default function JournalsPage() {
         </div>
 
         {/* Journal Entries Table Card */}
-        <Card className="border-none shadow-lg bg-white dark:bg-[#2A1D16] rounded-2xl overflow-hidden">
+        <Card className="border-none shadow-lg bg-white dark:bg-[#322F2C] rounded-2xl overflow-hidden">
           <CardHeader className="pb-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <CardTitle className="text-xl font-bold text-[#3b1a08] dark:text-white flex items-center gap-1.5">
+                <CardTitle className="text-xl font-bold text-[#4C382D] dark:text-white flex items-center gap-1.5">
                   <BookOpen className="h-5 w-5 text-slate-500" /> Buku Jurnal & Ledger
                 </CardTitle>
                 <CardDescription>Menampilkan log entri jurnal umum yang tersinkronisasi dari Odoo.</CardDescription>
@@ -119,7 +119,7 @@ export default function JournalsPage() {
             ) : filteredJournals.length === 0 ? (
               <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-2">
                 <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
-                <span className="font-semibold text-[#3b1a08] dark:text-white">Tidak ada entri jurnal ditemukan</span>
+                <span className="font-semibold text-[#4C382D] dark:text-white">Tidak ada entri jurnal ditemukan</span>
                 <span className="text-xs">Ubah filter pencarian atau pastikan transaksi sinkron.</span>
               </div>
             ) : (
