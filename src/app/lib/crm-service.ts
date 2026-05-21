@@ -47,7 +47,10 @@ import {
   confirmOdooQuotation,
   cancelOdooQuotation,
   getOdooPaymentTerms,
-  createOdooContact
+  createOdooContact,
+  getOdooAllCrmActivities,
+  getOdooRecentCrmMessages,
+  getOdooLeadTrackingMessages
 } from '@/services/odoo';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -848,3 +851,117 @@ export async function createContact(name: string, email?: string, phone?: string
   return await createOdooContact(name, email, phone);
 }
 
+// ─── Notification / Activity Functions ────────────────────────────────────────
+
+export interface OdooNotification {
+  id: string;
+  type: 'activity_overdue' | 'activity_upcoming' | 'stage_change' | 'lead_baru' | 'message';
+  title: string;
+  body: string;
+  leadId: string;
+  leadName: string;
+  deadline?: string;
+  date: string;
+  activityType?: string;
+  author?: string;
+}
+
+export async function getOdooNotifications(): Promise<OdooNotification[]> {
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const notifications: OdooNotification[] = [];
+
+  // 1. Fetch all pending CRM activities
+  try {
+    const activities = await getOdooAllCrmActivities();
+    for (const act of activities) {
+      const deadline = act.date_deadline ? String(act.date_deadline) : '';
+      const isOverdue = deadline && deadline < todayStr;
+      const isToday = deadline === todayStr;
+      const typeName = Array.isArray(act.activity_type_id) ? String(act.activity_type_id[1]) : 'Aktivitas';
+      const resName = act.res_name ? String(act.res_name) : `Lead #${act.res_id}`;
+      const summary = act.summary ? String(act.summary) : typeName;
+      const userName = Array.isArray(act.user_id) ? String(act.user_id[1]) : '';
+
+      let type: OdooNotification['type'] = 'activity_upcoming';
+      let title = `Aktivitas: ${summary}`;
+      let body = `${resName} — ${typeName}`;
+
+      if (isOverdue) {
+        type = 'activity_overdue';
+        title = `⚠️ Aktivitas Terlambat: ${summary}`;
+        body = `${resName} — Deadline: ${deadline}${userName ? ` (${userName})` : ''}`;
+      } else if (isToday) {
+        title = `🔔 Aktivitas Hari Ini: ${summary}`;
+        body = `${resName} — ${typeName}${userName ? ` (${userName})` : ''}`;
+      }
+
+      notifications.push({
+        id: `activity_${act.id}`,
+        type,
+        title,
+        body,
+        leadId: String(act.res_id),
+        leadName: resName,
+        deadline,
+        date: act.create_date ? String(act.create_date) : new Date().toISOString(),
+        activityType: typeName,
+        author: userName
+      });
+    }
+  } catch (e) {
+    console.warn('Failed to fetch Odoo activities for notifications:', e);
+  }
+
+  // 2. Fetch recent stage-change tracking messages
+  try {
+    const trackingMsgs = await getOdooLeadTrackingMessages();
+    for (const msg of trackingMsgs) {
+      const recordName = msg.record_name ? String(msg.record_name) : `Lead #${msg.res_id}`;
+      const bodyText = msg.body ? String(msg.body).replace(/<[^>]*>/g, '').trim() : 'Perubahan stage';
+      const authorName = Array.isArray(msg.author_id) ? String(msg.author_id[1]) : 'Odoo';
+      const msgDate = msg.date ? String(msg.date) : new Date().toISOString();
+
+      notifications.push({
+        id: `track_${msg.id}`,
+        type: 'stage_change',
+        title: `📋 Perubahan Stage: ${recordName}`,
+        body: bodyText || `Diubah oleh ${authorName}`,
+        leadId: String(msg.res_id),
+        leadName: recordName,
+        date: msgDate,
+        author: authorName
+      });
+    }
+  } catch (e) {
+    console.warn('Failed to fetch tracking messages for notifications:', e);
+  }
+
+  // 3. Fetch recent new leads (created in last 7 days)
+  try {
+    const leads = await getLeads();
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentLeads = leads.filter(l => {
+      if (!l.createdAt) return false;
+      const created = new Date(l.createdAt);
+      return created > sevenDaysAgo;
+    });
+    for (const lead of recentLeads.slice(0, 10)) {
+      notifications.push({
+        id: `lead_new_${lead.id}`,
+        type: 'lead_baru',
+        title: `🆕 Lead Baru: ${lead.namaPerusahaan}`,
+        body: `${lead.namaLengkap} — ${lead.kategoriBisnis || 'Lainnya'} | ${lead.kota || ''}`,
+        leadId: lead.id,
+        leadName: lead.namaPerusahaan,
+        date: lead.createdAt
+      });
+    }
+  } catch (e) {
+    console.warn('Failed to fetch new leads for notifications:', e);
+  }
+
+  // Sort by date desc
+  notifications.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return notifications.slice(0, 60);
+}

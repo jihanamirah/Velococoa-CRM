@@ -11,14 +11,10 @@ import {
   Bell, 
   Settings, 
   LogOut,
-  Menu,
   PlusCircle,
-  Package,
-  ArrowUpRight,
   Megaphone,
   Wallet,
   LayoutGrid,
-  Send,
   Target,
   MailOpen,
   Receipt,
@@ -38,10 +34,7 @@ import {
   SidebarProvider,
   SidebarTrigger 
 } from "@/components/ui/sidebar";
-import { collection, query, onSnapshot, addDoc, doc, setDoc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { useState, useEffect, useRef } from 'react';
-import { getLeads } from '@/app/lib/crm-service';
+import { useState, useEffect } from 'react';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
@@ -55,8 +48,6 @@ const navItems = [
 export function CRMLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
-  const initialLoadRef = useRef(true);
-  const cacheRef = useRef<Record<string, string>>({}); // Maps leadId -> status
 
   const isMarketing = pathname.startsWith('/marketing');
   const isAccounting = pathname.startsWith('/accounting');
@@ -90,94 +81,27 @@ export function CRMLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let intervalId: any;
-    
-    const syncOdooRealtime = async () => {
+
+    const syncNotifications = async () => {
       try {
-        const currentLeads = await getLeads();
-        
-        if (initialLoadRef.current) {
-          const newCache: Record<string, string> = {};
-          currentLeads.forEach(l => {
-            newCache[l.id] = l.status;
-          });
-          cacheRef.current = newCache;
-          initialLoadRef.current = false;
-          return;
-        }
-        
-        for (const l of currentLeads) {
-          const prevStatus = cacheRef.current[l.id];
-          
-          if (prevStatus === undefined) {
-            // New lead detected in Odoo!
-            const notifRef = doc(db, "notifications", `new_lead_${l.id}`);
-            const notifSnap = await getDoc(notifRef);
-            if (!notifSnap.exists()) {
-              await setDoc(notifRef, {
-                type: 'lead_baru',
-                title: 'Lead Baru Masuk!',
-                body: `${l.namaLengkap} - ${l.namaPerusahaan}`,
-                createdAt: new Date(),
-                read: false,
-                color: 'text-blue-500 bg-blue-500/10'
-              });
-            }
-            cacheRef.current[l.id] = l.status;
-          } else if (prevStatus !== l.status) {
-            // Stage / status transition detected in Odoo!
-            const notifRef = doc(db, "notifications", `stage_change_${l.id}_${l.stageId}`);
-            const notifSnap = await getDoc(notifRef);
-            if (!notifSnap.exists()) {
-              await setDoc(notifRef, {
-                type: 'follow_up',
-                title: 'Tahap Lead Diperbarui',
-                body: `${l.namaLengkap} (${l.namaPerusahaan}) berpindah ke tahap ${l.status}`,
-                createdAt: new Date(),
-                read: false,
-                color: 'text-amber-500 bg-amber-500/10'
-              });
-            }
-            cacheRef.current[l.id] = l.status;
-          }
-        }
+        const { getOdooNotifications } = await import('@/app/lib/crm-service');
+        const notifs = await getOdooNotifications();
+        // Count overdue activities + new leads this week as "unread" badges
+        const unread = notifs.filter(n => 
+          n.type === 'activity_overdue' || 
+          n.type === 'lead_baru'
+        ).length;
+        setUnreadCount(unread);
       } catch (err) {
-        console.warn("Background sync error:", err);
+        console.warn('Notification sync error:', err);
       }
     };
 
-    // Sync immediately and poll every 30 seconds
-    syncOdooRealtime();
-    intervalId = setInterval(syncOdooRealtime, 30000);
-
+    syncNotifications();
+    intervalId = setInterval(syncNotifications, 60000); // refresh every 60s
     return () => clearInterval(intervalId);
   }, []);
 
-  useEffect(() => {
-    const q = query(collection(db, "notifications"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      let unread = 0;
-      if (snapshot.empty) {
-        const initial = [
-          { type: 'lead_baru', title: 'Lead Baru Masuk!', body: 'Kopi Kenangan Senja - Kafe & Kedai Kopi', createdAt: new Date(Date.now() - 7200000), read: false, color: 'text-blue-500 bg-blue-500/10' },
-          { type: 'follow_up', title: 'Follow Up Diperlukan!', body: 'Sweet Bakery belum dihubungi lebih dari 24 jam', createdAt: new Date(Date.now() - 86400000), read: false, color: 'text-amber-500 bg-amber-500/10' },
-          { type: 'keputusan', title: 'Keputusan Diperlukan!', body: 'Grand Aston Hotel menunggu keputusan Won atau Lost', createdAt: new Date(Date.now() - 172800000), read: true, color: 'text-red-500 bg-red-500/10' },
-        ];
-        initial.forEach(n => addDoc(collection(db, "notifications"), n).catch(() => {}));
-        unread = 2;
-      } else {
-        snapshot.forEach((doc) => {
-          if (!doc.data().read) {
-            unread++;
-          }
-        });
-      }
-      setUnreadCount(unread);
-    }, (err) => {
-      console.warn("Failed to listen to notifications in layout:", err);
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   return (
     <SidebarProvider>

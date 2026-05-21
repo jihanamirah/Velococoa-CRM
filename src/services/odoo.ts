@@ -412,6 +412,60 @@ export async function scheduleOdooActivity(leadId: number, activityTypeId: numbe
   }
 }
 
+// Fetch ALL pending/overdue activities across all CRM leads (for global notifications)
+export async function getOdooAllCrmActivities() {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const rawXml = await execute('mail.activity', 'search_read', [[
+      ['res_model', '=', 'crm.lead']
+    ]], {
+      fields: ['id', 'res_id', 'res_name', 'activity_type_id', 'summary', 'note', 'date_deadline', 'create_date', 'user_id'],
+      limit: 50,
+      order: 'date_deadline asc'
+    });
+    return parseOdooRecords(rawXml);
+  } catch (error) {
+    console.error('getOdooAllCrmActivities failed:', error);
+    return [];
+  }
+}
+
+// Fetch recent tracking messages (stage changes, log notes) for all CRM leads
+export async function getOdooRecentCrmMessages() {
+  try {
+    const rawXml = await execute('mail.message', 'search_read', [[
+      ['model', '=', 'crm.lead'],
+      ['message_type', 'in', ['email', 'comment']],
+    ]], {
+      fields: ['id', 'res_id', 'record_name', 'date', 'body', 'message_type', 'subtype_id', 'author_id'],
+      limit: 30,
+      order: 'date desc'
+    });
+    return parseOdooRecords(rawXml);
+  } catch (error) {
+    console.error('getOdooRecentCrmMessages failed:', error);
+    return [];
+  }
+}
+
+// Fetch tracking/log messages (stage changes) specifically  
+export async function getOdooLeadTrackingMessages() {
+  try {
+    const rawXml = await execute('mail.message', 'search_read', [[
+      ['model', '=', 'crm.lead'],
+      ['tracking_value_ids', '!=', false]
+    ]], {
+      fields: ['id', 'res_id', 'record_name', 'date', 'body', 'author_id', 'tracking_value_ids'],
+      limit: 40,
+      order: 'date desc'
+    });
+    return parseOdooRecords(rawXml);
+  } catch (error) {
+    console.error('getOdooLeadTrackingMessages failed:', error);
+    return [];
+  }
+}
+
 export async function getOdooContacts() {
   try {
     const rawXml = await execute('res.partner', 'search_read', [[
