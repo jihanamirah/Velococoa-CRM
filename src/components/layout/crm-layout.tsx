@@ -45,6 +45,10 @@ const navItems = [
   { icon: Wallet, label: 'Accounting Portal', href: '/accounting' },
 ];
 
+let globalUnreadCountCache: number | null = null;
+let globalLastFetchTime = 0;
+const CACHE_TTL_MS = 30000; // 30 seconds
+
 export function CRMLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -83,6 +87,12 @@ export function CRMLayout({ children }: { children: React.ReactNode }) {
     let intervalId: any;
 
     const syncNotifications = async () => {
+      const now = Date.now();
+      if (globalUnreadCountCache !== null && (now - globalLastFetchTime < CACHE_TTL_MS)) {
+        setUnreadCount(globalUnreadCountCache);
+        return;
+      }
+
       try {
         const { getOdooNotifications } = await import('@/app/lib/crm-service');
         const notifs = await getOdooNotifications();
@@ -91,6 +101,8 @@ export function CRMLayout({ children }: { children: React.ReactNode }) {
           n.type === 'activity_overdue' || 
           n.type === 'lead_baru'
         ).length;
+        globalUnreadCountCache = unread;
+        globalLastFetchTime = now;
         setUnreadCount(unread);
       } catch (err) {
         console.warn('Notification sync error:', err);

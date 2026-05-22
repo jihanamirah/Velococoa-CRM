@@ -52,14 +52,33 @@ async function xmlrpcCall(service: string, method: string, ...params: any[]) {
     throw new Error(`Odoo HTTP Error: ${response.status} ${response.statusText}`);
   }
 
-  return await response.text();
+  const responseText = await response.text();
+
+  if (responseText.includes('<fault>')) {
+    const faultStringMatch = responseText.match(/<name>faultString<\/name>[\s\S]*?<string>([\s\S]*?)<\/string>/);
+    const faultCodeMatch = responseText.match(/<name>faultCode<\/name>[\s\S]*?<int>(\d+)<\/int>/);
+    const faultString = faultStringMatch 
+      ? faultStringMatch[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>') 
+      : 'Unknown Odoo Fault';
+    const faultCode = faultCodeMatch ? parseInt(faultCodeMatch[1], 10) : 0;
+    throw new Error(faultString);
+  }
+
+  return responseText;
 }
 
+let cachedUid: number | null = null;
+
 export async function authenticate(): Promise<number | null> {
+  if (cachedUid !== null) return cachedUid;
   try {
     const res = await xmlrpcCall('common', 'authenticate', ODOO_CONFIG.db, ODOO_CONFIG.username, ODOO_CONFIG.password, {});
     const match = res.match(/<int>(\d+)<\/int>/);
-    return match ? parseInt(match[1], 10) : null;
+    if (match) {
+      cachedUid = parseInt(match[1], 10);
+      return cachedUid;
+    }
+    return null;
   } catch (err) {
     console.error('Odoo Authentication Failed:', err);
     return null;

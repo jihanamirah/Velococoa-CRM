@@ -161,9 +161,16 @@ export default function InvoicesPage() {
       ]);
 
       // Filter specifically for PT VeloCocoa relevant invoices
-      const velococoaInvoices = fetchedInvoices.filter(inv => 
-        inv.partnerName.toLowerCase().includes('velococoa')
-      );
+      const velococoaInvoices = fetchedInvoices.filter(inv => {
+        const name = inv.partnerName.toLowerCase();
+        return name.includes('velococoa') ||
+               name.includes('harmoni') ||
+               name.includes('klasik') ||
+               name.includes('literasi') ||
+               name.includes('mitra') ||
+               name.includes('grand') ||
+               name.includes('hilton');
+      });
 
       // Filter specifically for PT VeloCocoa relevant contacts/partners
       const velococoaContacts = fetchedContacts.filter(c => 

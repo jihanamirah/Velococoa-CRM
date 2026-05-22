@@ -23,7 +23,9 @@ import {
   Calendar,
   DollarSign,
   TrendingUp,
-  ExternalLink
+  ExternalLink,
+  Receipt,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 import { 
@@ -37,7 +39,8 @@ import {
   cancelQuotation,
   updateLeadStatus,
   Quotation, 
-  QuotationLine
+  QuotationLine,
+  createInvoiceFromQuotation
 } from '@/app/lib/crm-service';
 import { cn } from '@/lib/utils';
 
@@ -61,6 +64,12 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
   const [partnerId, setPartnerId] = useState<number>(0);
   const [validityDate, setValidityDate] = useState<string>('');
   const [paymentTermId, setPaymentTermId] = useState<number | undefined>(undefined);
+
+  // Invoice modal state
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [invoiceType, setInvoiceType] = useState<'regular' | 'percentage' | 'fixed'>('regular');
+  const [downPaymentValue, setDownPaymentValue] = useState<number>(0);
+  const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -90,15 +99,17 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
           setLines([]);
         }
 
-        // Load products, terms, contacts
-        const [prodList, termList, contactList] = await Promise.all([
-          getProducts(),
-          getPaymentTerms(),
-          getContacts()
-        ]);
-        setProducts(prodList);
-        setPaymentTerms(termList);
-        setContacts(contactList);
+        // Load products, terms, contacts only if quotation is editable
+        if (qData.state !== 'sale' && qData.state !== 'cancel') {
+          const [prodList, termList, contactList] = await Promise.all([
+            getProducts(),
+            getPaymentTerms(),
+            getContacts()
+          ]);
+          setProducts(prodList);
+          setPaymentTerms(termList);
+          setContacts(contactList);
+        }
       } catch (err) {
         console.error("Gagal memuat detail penawaran:", err);
       } finally {
@@ -339,6 +350,43 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
     });
   };
 
+  const handleCreateInvoice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quotation) return;
+
+    try {
+      setIsCreatingInvoice(true);
+      const res = await createInvoiceFromQuotation(
+        quotation.id,
+        invoiceType,
+        invoiceType === 'regular' ? undefined : downPaymentValue
+      );
+
+      if (res.success && res.invoiceId) {
+        toast({
+          title: "Invoice Dibuat",
+          description: "Draft invoice berhasil dibuat di Odoo dan disinkronkan ke Accounting.",
+        });
+        setIsInvoiceModalOpen(false);
+        router.push('/accounting/invoices');
+      } else {
+        toast({
+          title: "Gagal Membuat Invoice",
+          description: res.error || "Gagal membuat invoice di Odoo.",
+          variant: "destructive"
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Terjadi kesalahan",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingInvoice(false);
+    }
+  };
+
   const handlePrint = () => {
     toast({
       title: "Cetak Dokumen",
@@ -429,21 +477,32 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
 
         {/* Action Panel Buttons */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {quotation.state !== 'sale' && quotation.state !== 'cancel' && (
-            <>
-              <Button onClick={handleSend} variant="outline" className="border-border/60 hover:bg-muted">
-                <Send className="mr-2 h-4 w-4 text-purple-500" /> Send
-              </Button>
-              <Button onClick={handlePrint} variant="outline" className="border-border/60 hover:bg-muted">
-                <Printer className="mr-2 h-4 w-4 text-blue-500" /> Print
-              </Button>
-              <Button onClick={handleConfirmOrder} disabled={isConfirming} className="bg-primary hover:bg-primary/90 text-white shadow-md">
-                {isConfirming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />} Confirm
-              </Button>
-            </>
+          {quotation.state === 'sale' && (
+            <Button onClick={() => setIsInvoiceModalOpen(true)} className="bg-primary hover:bg-primary/90 text-white shadow-md font-bold">
+              <Receipt className="mr-2 h-4 w-4" /> Create Invoice
+            </Button>
           )}
+
+          {quotation.state === 'sent' && (
+            <Button onClick={handleConfirmOrder} disabled={isConfirming} className="bg-primary hover:bg-primary/90 text-white shadow-md font-bold">
+              {isConfirming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />} Confirm
+            </Button>
+          )}
+
           {quotation.state !== 'cancel' && (
-            <Button onClick={handleCancelOrder} disabled={isCancelling} variant="outline" className="text-destructive border-destructive/20 hover:bg-destructive/10">
+            <Button onClick={handleSend} variant="outline" className="border-border/60 hover:bg-muted font-medium">
+              <Send className="mr-2 h-4 w-4 text-purple-500" /> Send
+            </Button>
+          )}
+
+          {quotation.state !== 'cancel' && (
+            <Button onClick={handlePrint} variant="outline" className="border-border/60 hover:bg-muted font-medium">
+              <Printer className="mr-2 h-4 w-4 text-blue-500" /> Preview
+            </Button>
+          )}
+
+          {quotation.state !== 'cancel' && (
+            <Button onClick={handleCancelOrder} disabled={isCancelling} variant="outline" className="text-destructive border-destructive/20 hover:bg-destructive/10 font-medium">
               {isCancelling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />} Cancel
             </Button>
           )}
@@ -451,7 +510,7 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
           <div className="flex-1"></div>
           
           {quotation.state !== 'sale' && quotation.state !== 'cancel' && (
-            <Button onClick={handleSaveChanges} disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+            <Button onClick={handleSaveChanges} disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold">
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Simpan
             </Button>
           )}
@@ -466,22 +525,27 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
               <div className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Customer</label>
-                  <Select 
-                    value={String(partnerId)} 
-                    onValueChange={(val) => setPartnerId(parseInt(val, 10))}
-                    disabled={quotation.state === 'sale' || quotation.state === 'cancel'}
-                  >
-                    <SelectTrigger className="bg-card/50 border-border/50 h-11">
-                      <SelectValue placeholder="Pilih Pelanggan" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {contacts.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name} {c.email ? `(${c.email})` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {quotation.state === 'sale' || quotation.state === 'cancel' ? (
+                    <div className="bg-card/30 border border-border/40 h-11 rounded-lg px-3.5 flex items-center text-sm font-medium text-foreground">
+                      🏢 {quotation.partnerName || 'Mitra Umum'}
+                    </div>
+                  ) : (
+                    <Select 
+                      value={String(partnerId)} 
+                      onValueChange={(val) => setPartnerId(parseInt(val, 10))}
+                    >
+                      <SelectTrigger className="bg-card/50 border-border/50 h-11">
+                        <SelectValue placeholder="Pilih Pelanggan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {contacts.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name} {c.email ? `(${c.email})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
 
@@ -495,29 +559,34 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
                     value={validityDate}
                     onChange={(e) => setValidityDate(e.target.value)}
                     disabled={quotation.state === 'sale' || quotation.state === 'cancel'}
-                    className="bg-card/50 border-border/50 h-11"
+                    className="bg-card/50 border-border/50 h-11 disabled:bg-card/30 disabled:border-border/40 disabled:opacity-100 disabled:cursor-not-allowed"
                   />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Payment Terms</label>
-                  <Select 
-                    value={paymentTermId ? String(paymentTermId) : 'none'} 
-                    onValueChange={(val) => setPaymentTermId(val === 'none' ? undefined : parseInt(val, 10))}
-                    disabled={quotation.state === 'sale' || quotation.state === 'cancel'}
-                  >
-                    <SelectTrigger className="bg-card/50 border-border/50 h-11">
-                      <SelectValue placeholder="Immediate Payment" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Immediate Payment</SelectItem>
-                      {paymentTerms.map((t) => (
-                        <SelectItem key={t.id} value={String(t.id)}>
-                          {t.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {quotation.state === 'sale' || quotation.state === 'cancel' ? (
+                    <div className="bg-card/30 border border-border/40 h-11 rounded-lg px-3.5 flex items-center text-sm font-medium text-foreground">
+                      💳 {quotation.paymentTermName || 'Immediate Payment'}
+                    </div>
+                  ) : (
+                    <Select 
+                      value={paymentTermId ? String(paymentTermId) : 'none'} 
+                      onValueChange={(val) => setPaymentTermId(val === 'none' ? undefined : parseInt(val, 10))}
+                    >
+                      <SelectTrigger className="bg-card/50 border-border/50 h-11">
+                        <SelectValue placeholder="Immediate Payment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Immediate Payment</SelectItem>
+                        {paymentTerms.map((t) => (
+                          <SelectItem key={t.id} value={String(t.id)}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
             </div>
@@ -555,47 +624,62 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
                       ) : (
                         lines.map((line) => (
                           <tr key={line.id} className="hover:bg-muted/10 transition-colors">
-                            {/* Product Select */}
+                            {/* Product Select / Name */}
                             <td className="p-3">
-                              <Select
-                                value={line.productId ? String(line.productId) : ''}
-                                onValueChange={(val) => handleLineProductChange(line.id, val)}
-                                disabled={quotation.state === 'sale' || quotation.state === 'cancel'}
-                              >
-                                <SelectTrigger className="w-full border-border/30 bg-card/30">
-                                  <SelectValue placeholder="Pilih produk..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {products.map((p) => (
-                                    <SelectItem key={p.id} value={p.id}>
-                                      {p.sku ? `[${p.sku}] ` : ''}{p.name} ({formatIDR(p.price)})
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              {quotation.state === 'sale' || quotation.state === 'cancel' ? (
+                                <div className="text-sm font-medium text-foreground px-2 py-1 bg-muted/10 border border-transparent">
+                                  📦 {line.productName || line.name || `Produk #${line.productId}`}
+                                </div>
+                              ) : (
+                                <Select
+                                  value={line.productId ? String(line.productId) : ''}
+                                  onValueChange={(val) => handleLineProductChange(line.id, val)}
+                                >
+                                  <SelectTrigger className="w-full border-border/30 bg-card/30">
+                                    <SelectValue placeholder="Pilih produk..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {products.map((p) => (
+                                      <SelectItem key={p.id} value={p.id}>
+                                        {p.sku ? `[${p.sku}] ` : ''}{p.name} ({formatIDR(p.price)})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
                             </td>
 
-                            {/* Quantity Input */}
+                            {/* Quantity Input / Text */}
                             <td className="p-3 text-right">
-                              <Input
-                                type="number"
-                                min="1"
-                                value={line.quantity}
-                                onChange={(e) => handleLineQtyChange(line.id, parseInt(e.target.value, 10) || 1)}
-                                className="text-right border-border/30 bg-card/30 w-full"
-                                disabled={quotation.state === 'sale' || quotation.state === 'cancel'}
-                              />
+                              {quotation.state === 'sale' || quotation.state === 'cancel' ? (
+                                <div className="text-sm font-medium text-foreground pr-4">
+                                  {line.quantity}
+                                </div>
+                              ) : (
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={line.quantity}
+                                  onChange={(e) => handleLineQtyChange(line.id, parseInt(e.target.value, 10) || 1)}
+                                  className="text-right border-border/30 bg-card/30 w-full"
+                                />
+                              )}
                             </td>
 
-                            {/* Unit Price Input */}
+                            {/* Unit Price Input / Text */}
                             <td className="p-3 text-right">
-                              <Input
-                                type="number"
-                                value={line.priceUnit}
-                                onChange={(e) => handleLinePriceChange(line.id, parseFloat(e.target.value) || 0)}
-                                className="text-right border-border/30 bg-card/30 w-full"
-                                disabled={quotation.state === 'sale' || quotation.state === 'cancel'}
-                              />
+                              {quotation.state === 'sale' || quotation.state === 'cancel' ? (
+                                <div className="text-sm font-medium text-foreground pr-4">
+                                  {formatIDR(line.priceUnit)}
+                                </div>
+                              ) : (
+                                <Input
+                                  type="number"
+                                  value={line.priceUnit}
+                                  onChange={(e) => handleLinePriceChange(line.id, parseFloat(e.target.value) || 0)}
+                                  className="text-right border-border/30 bg-card/30 w-full"
+                                />
+                              )}
                             </td>
 
                             {/* Taxes hardcode PPN 11% */}
@@ -698,6 +782,145 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal: Create Invoice */}
+      {isInvoiceModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 p-4">
+          <form 
+            onSubmit={handleCreateInvoice}
+            className="bg-card w-full max-w-lg p-6 rounded-2xl shadow-2xl border border-primary/20 space-y-6 text-left max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between border-b border-border/30 pb-3">
+              <h2 className="text-xl font-bold flex items-center gap-2 text-foreground">
+                Create invoice(s)
+              </h2>
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsInvoiceModalOpen(false)}
+                className="text-muted-foreground hover:bg-muted/10 h-8 w-8 rounded-full"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Radio Group options */}
+            <div className="space-y-4">
+              <label className="text-sm font-semibold text-muted-foreground uppercase tracking-wider block">
+                Create Invoice?
+              </label>
+              
+              <div className="space-y-3">
+                <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg hover:bg-muted/30 border border-transparent transition-colors">
+                  <input 
+                    type="radio" 
+                    name="invoiceType" 
+                    value="regular"
+                    checked={invoiceType === 'regular'}
+                    onChange={() => setInvoiceType('regular')}
+                    className="h-4 w-4 rounded-full border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                  />
+                  <span className="text-sm font-medium text-foreground">Regular invoice</span>
+                </label>
+
+                <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg hover:bg-muted/30 border border-transparent transition-colors">
+                  <input 
+                    type="radio" 
+                    name="invoiceType" 
+                    value="percentage"
+                    checked={invoiceType === 'percentage'}
+                    onChange={() => setInvoiceType('percentage')}
+                    className="h-4 w-4 rounded-full border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                  />
+                  <span className="text-sm font-medium text-foreground">Down payment (percentage)</span>
+                </label>
+
+                <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg hover:bg-muted/30 border border-transparent transition-colors">
+                  <input 
+                    type="radio" 
+                    name="invoiceType" 
+                    value="fixed"
+                    checked={invoiceType === 'fixed'}
+                    onChange={() => setInvoiceType('fixed')}
+                    className="h-4 w-4 rounded-full border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                  />
+                  <span className="text-sm font-medium text-foreground">Down payment (fixed amount)</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Dynamic input for Down Payment values */}
+            {invoiceType === 'percentage' && (
+              <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+                  Down Payment?
+                </label>
+                <div className="flex items-center space-x-2">
+                  <Input 
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="any"
+                    value={downPaymentValue || ''}
+                    onChange={(e) => setDownPaymentValue(parseFloat(e.target.value) || 0)}
+                    className="w-32 bg-card border-border text-foreground font-bold"
+                    required
+                  />
+                  <span className="text-sm font-bold text-muted-foreground">%</span>
+                </div>
+              </div>
+            )}
+
+            {invoiceType === 'fixed' && (
+              <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+                  Down Payment Amount?
+                </label>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-bold text-muted-foreground">Rp</span>
+                  <Input 
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={downPaymentValue || ''}
+                    onChange={(e) => setDownPaymentValue(parseFloat(e.target.value) || 0)}
+                    className="w-48 bg-card border-border text-foreground font-bold"
+                    placeholder="Contoh: 1000000"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3 pt-4 border-t border-border/20">
+              <Button 
+                type="submit" 
+                disabled={isCreatingInvoice}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-md transition-all flex items-center"
+              >
+                {isCreatingInvoice ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Draft"
+                )}
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setIsInvoiceModalOpen(false)}
+                className="border-border/60 hover:bg-muted font-semibold px-6 py-2.5 rounded-xl transition-all"
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
     </CRMLayout>
   );
 }

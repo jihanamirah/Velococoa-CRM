@@ -8,64 +8,130 @@ import { execute } from '@/lib/odoo';
 
 function extractValue(xml: string): any {
   if (xml.includes('<nil/>')) return null;
-  
-  // 1. Check for array first to prevent array strings matching string check
-  const arrayMatch = xml.match(/<array>[\s\S]*?<data>([\s\S]*?)<\/data>[\s\S]*?<\/array>/);
-  if (arrayMatch) {
-    const valuePart = arrayMatch[1];
-    const matches = valuePart.match(/<value>(?:(?!<value>)[\s\S])*?<\/value>/g) || [];
-    return matches.map(v => {
-      const inner = v.replace(/^<value>([\s\S]*)<\/value>$/, '$1');
+
+  const trimmed = xml.trim();
+  if (trimmed.startsWith('<array>')) {
+    const dataStart = trimmed.indexOf('<data>');
+    const dataEnd = trimmed.lastIndexOf('</data>');
+    if (dataStart === -1 || dataEnd === -1) return [];
+    const dataContent = trimmed.substring(dataStart + 6, dataEnd).trim();
+    
+    const values: string[] = [];
+    let depth = 0;
+    let current = '';
+    let i = 0;
+    while (i < dataContent.length) {
+      const char = dataContent[i];
+      if (dataContent.substring(i, i + 7) === '<value>') {
+        if (depth === 0) {
+          current = '';
+        }
+        depth++;
+        current += '<value>';
+        i += 7;
+        continue;
+      }
+      if (dataContent.substring(i, i + 8) === '</value>') {
+        depth--;
+        current += '</value>';
+        i += 8;
+        if (depth === 0) {
+          values.push(current);
+        }
+        continue;
+      }
+      if (depth > 0) {
+        current += char;
+      }
+      i++;
+    }
+    return values.map(v => {
+      const inner = v.substring(7, v.length - 8);
       return extractValue(inner);
     });
   }
 
-  // 2. Simple types
-  const sMatch = xml.match(/<string>([\s\S]*?)<\/string>/);
+  if (trimmed.startsWith('<struct>')) {
+    const members: { [key: string]: any } = {};
+    let depth = 0;
+    let currentMember = '';
+    let i = 0;
+    const memberStrings: string[] = [];
+    while (i < trimmed.length) {
+      const char = trimmed[i];
+      if (trimmed.substring(i, i + 8) === '<member>') {
+        if (depth === 0) {
+          currentMember = '';
+        }
+        depth++;
+        currentMember += '<member>';
+        i += 8;
+        continue;
+      }
+      if (trimmed.substring(i, i + 9) === '</member>') {
+        depth--;
+        currentMember += '</member>';
+        i += 9;
+        if (depth === 0) {
+          memberStrings.push(currentMember);
+        }
+        continue;
+      }
+      if (depth > 0) {
+        currentMember += char;
+      }
+      i++;
+    }
+
+    for (const m of memberStrings) {
+      const nameMatch = m.match(/<name>(.*?)<\/name>/);
+      if (nameMatch) {
+        const name = nameMatch[1];
+        const valStart = m.indexOf('<value>');
+        const valEnd = m.lastIndexOf('</value>');
+        if (valStart !== -1 && valEnd !== -1) {
+          const valXml = m.substring(valStart + 7, valEnd);
+          members[name] = extractValue(valXml);
+        }
+      }
+    }
+    return members;
+  }
+
+  const sMatch = trimmed.match(/^<string>([\s\S]*?)<\/string>$/);
   if (sMatch) return sMatch[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-  
-  const iMatch = xml.match(/<int>(-?\d+)<\/int>/);
+
+  const iMatch = trimmed.match(/^<int>(-?\d+)<\/int>$/);
   if (iMatch) return parseInt(iMatch[1], 10);
-  
-  const bMatch = xml.match(/<boolean>([01])<\/boolean>/);
+
+  const bMatch = trimmed.match(/^<boolean>([01])<\/boolean>$/);
   if (bMatch) return bMatch[1] === '1';
 
-  const dMatch = xml.match(/<double>([\d.]+)<\/double>/);
+  const dMatch = trimmed.match(/^<double>([\d.]+)<\/double>$/);
   if (dMatch) return parseFloat(dMatch[1]);
+
+  const sMatchLoose = trimmed.match(/<string>([\s\S]*?)<\/string>/);
+  if (sMatchLoose) return sMatchLoose[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+
+  const iMatchLoose = trimmed.match(/<int>(-?\d+)<\/int>/);
+  if (iMatchLoose) return parseInt(iMatchLoose[1], 10);
 
   return null;
 }
 
-function getMemberValueXml(memberXml: string): string {
-  const nameEndTag = '</name>';
-  const memberEndTag = '</member>';
-  const startIdx = memberXml.indexOf(nameEndTag);
-  const endIdx = memberXml.lastIndexOf(memberEndTag);
-  if (startIdx === -1 || endIdx === -1) return '';
-  
-  const content = memberXml.substring(startIdx + nameEndTag.length, endIdx).trim();
-  // Strip outer <value> and </value> if present
-  const match = content.match(/^<value>([\s\S]*)<\/value>$/);
-  return match ? match[1].trim() : content;
-}
-
 function parseOdooRecords(xml: string): any[] {
-  const records: any[] = [];
-  const structMatches = xml.match(/<struct>[\s\S]*?<\/struct>/g) || [];
-
-  for (const struct of structMatches) {
-    const obj: any = {};
-    const memberMatches = struct.match(/<member>[\s\S]*?<\/member>/g) || [];
-    for (const member of memberMatches) {
-      const name = member.match(/<name>(.*?)<\/name>/)?.[1];
-      if (name) {
-        const valXml = getMemberValueXml(member);
-        obj[name] = extractValue(valXml);
-      }
-    }
-    records.push(obj);
+  const valueStart = xml.indexOf('<value>');
+  const valueEnd = xml.lastIndexOf('</value>');
+  if (valueStart === -1 || valueEnd === -1) return [];
+  const rootValueXml = xml.substring(valueStart + 7, valueEnd);
+  
+  const parsed = extractValue(rootValueXml);
+  if (Array.isArray(parsed)) {
+    return parsed;
+  } else if (parsed && typeof parsed === 'object') {
+    return [parsed];
   }
-  return records;
+  return parsed !== null && parsed !== undefined ? [parsed] : [];
 }
 
 export async function getOdooStages() {
@@ -466,6 +532,20 @@ export async function getOdooLeadTrackingMessages() {
   }
 }
 
+export async function getOdooNotificationRawData() {
+  try {
+    const [activities, trackingMsgs, leads] = await Promise.all([
+      getOdooAllCrmActivities(),
+      getOdooLeadTrackingMessages(),
+      getOdooLeads()
+    ]);
+    return { activities, trackingMsgs, leads };
+  } catch (error) {
+    console.error('getOdooNotificationRawData failed:', error);
+    return { activities: [], trackingMsgs: [], leads: [] };
+  }
+}
+
 export async function getOdooContacts() {
   try {
     const rawXml = await execute('res.partner', 'search_read', [[
@@ -601,7 +681,13 @@ export async function createOdooInvoice(
       }]]
     }
 
-    const newInvoiceId = await execute('account.move', 'create', [params]);
+    const resXml = await execute('account.move', 'create', [params]);
+    const match = resXml.match(/<int>(\d+)<\/int>/);
+    const newInvoiceId = match ? parseInt(match[1], 10) : null;
+
+    if (!newInvoiceId) {
+      throw new Error("Failed to create Odoo invoice.");
+    }
     
     if (confirmAndPost) {
       // Auto confirm/post draft invoice in Odoo
@@ -740,10 +826,11 @@ export async function createOdooUtmSource(name: string) {
 export async function payOdooInvoice(invoiceId: number, amount: number, paymentDate: string, journalType: 'bank' | 'cash') {
   try {
     // 1. Find journal_id of specified type (bank or cash)
-    const journals = await execute('account.journal', 'search_read', [
+    const journalsXml = await execute('account.journal', 'search_read', [
       [['type', '=', journalType === 'bank' ? 'bank' : 'cash']],
       ['id', 'name']
     ]);
+    const journals = parseOdooRecords(journalsXml);
     
     if (journals.length === 0) {
       throw new Error(`Odoo journal of type ${journalType} not found.`);
@@ -758,15 +845,22 @@ export async function payOdooInvoice(invoiceId: number, amount: number, paymentD
 
     // Get the default values from context to fetch linked receivable line_ids
     const defaultFields = ['line_ids'];
-    const defaultVals = await execute('account.payment.register', 'default_get', [defaultFields], { context });
-    const lineIds = defaultVals?.line_ids || [];
+    const defaultValsXml = await execute('account.payment.register', 'default_get', [defaultFields], { context });
+    const parsedDefaults = parseOdooRecords(defaultValsXml);
+    const lineIds = parsedDefaults[0]?.line_ids || [];
 
-    const wizardId = await execute('account.payment.register', 'create', [{
+    const wizardXml = await execute('account.payment.register', 'create', [{
       payment_date: paymentDate,
       journal_id: journalId,
       amount: amount,
       line_ids: lineIds
     }], { context });
+
+    const wizardMatch = wizardXml.match(/<int>(\d+)<\/int>/);
+    const wizardId = wizardMatch ? parseInt(wizardMatch[1], 10) : null;
+    if (!wizardId) {
+      throw new Error("Failed to create Odoo payment wizard.");
+    }
 
     // 3. Confirm payment to reconcile invoice
     await execute('account.payment.register', 'action_create_payments', [[wizardId]], { context });
@@ -1034,3 +1128,86 @@ export async function createOdooContact(name: string, email?: string, phone?: st
     return { success: false, error: error.message };
   }
 }
+
+export async function createInvoiceFromQuotation(
+  quotationId: number,
+  invoiceType: 'regular' | 'percentage' | 'fixed',
+  downPaymentValue?: number
+) {
+  try {
+    const quotation = await getOdooQuotationById(quotationId);
+    if (!quotation) {
+      return { success: false, error: 'Quotation tidak ditemukan' };
+    }
+
+    const partnerId = Array.isArray(quotation.partner_id) ? quotation.partner_id[0] : quotation.partner_id;
+    if (!partnerId) {
+      return { success: false, error: 'Customer tidak valid pada Quotation ini' };
+    }
+
+    const invoiceLines: any[] = [];
+    let note = `Faktur untuk ${quotation.name}`;
+
+    if (invoiceType === 'regular') {
+      const lineIds = Array.isArray(quotation.order_line) ? quotation.order_line : [];
+      if (lineIds.length === 0) {
+        return { success: false, error: 'Quotation tidak memiliki item produk untuk dibuat faktur' };
+      }
+      const lines = await getOdooQuotationLines(lineIds);
+      lines.forEach((line: any) => {
+        const prodId = Array.isArray(line.product_id) ? line.product_id[0] : line.product_id;
+        invoiceLines.push([0, 0, {
+          product_id: prodId || false,
+          name: line.name || 'Produk',
+          quantity: line.product_uom_qty || 1,
+          price_unit: line.price_unit || 0
+        }]);
+      });
+    } else {
+      let amount = 0;
+      let description = '';
+
+      if (invoiceType === 'percentage') {
+        const percent = downPaymentValue || 0;
+        amount = (quotation.amount_total || 0) * (percent / 100);
+        description = `Down payment of ${percent}% for ${quotation.name}`;
+      } else {
+        amount = downPaymentValue || 0;
+        description = `Down payment for ${quotation.name}`;
+      }
+
+      note = description;
+      invoiceLines.push([0, 0, {
+        name: description,
+        quantity: 1,
+        price_unit: amount
+      }]);
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const dueStr = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const params: any = {
+      move_type: 'out_invoice',
+      partner_id: partnerId,
+      invoice_date: todayStr,
+      invoice_date_due: dueStr,
+      narration: note,
+      invoice_line_ids: invoiceLines
+    };
+
+    const resXml = await execute('account.move', 'create', [params]);
+    const match = resXml.match(/<int>(\d+)<\/int>/);
+    const newInvoiceId = match ? parseInt(match[1], 10) : null;
+
+    if (!newInvoiceId) {
+      return { success: false, error: 'Gagal membuat invoice di Odoo' };
+    }
+
+    return { success: true, invoiceId: newInvoiceId };
+  } catch (error: any) {
+    console.error('createInvoiceFromQuotation failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+

@@ -129,29 +129,46 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [stateOptions, setStateOptions] = useState<any[]>([]);
   const [salesTeamOptions, setSalesTeamOptions] = useState<any[]>([]);
 
-  // Load dropdown options once on mount
+  // Load dropdown options only when entering edit mode
   useEffect(() => {
-    getUtmCampaigns().then((campaigns) => {
-      const filtered = campaigns.filter((u: any) => {
-        const text = ((u.title || '') + ' ' + (u.name || '')).toLowerCase();
-        return text.includes('velococoa') || 
-               text.includes('mitra') || 
-               text.includes('ethicocoa') || 
-               text.includes('chocora') || 
-               text.includes('campaign');
-      });
-      setCampaignOptions(filtered);
-    }).catch(console.error);
-    getMediums().then(setMediumOptions).catch(console.error);
-    getSources().then(setSourceOptions).catch(console.error);
-    getCountries().then(setCountryOptions).catch(console.error);
-    getSalesTeams().then(setSalesTeamOptions).catch(console.error);
-  }, []);
+    if (!isEditing) return;
 
-  // Fetch states whenever countryId changes
+    if (campaignOptions.length === 0) {
+      getUtmCampaigns().then((campaigns) => {
+        const filtered = campaigns.filter((u: any) => {
+          const text = ((u.title || '') + ' ' + (u.name || '')).toLowerCase();
+          return text.includes('velococoa') || 
+                 text.includes('mitra') || 
+                 text.includes('ethicocoa') || 
+                 text.includes('chocora') || 
+                 text.includes('campaign');
+        });
+        setCampaignOptions(filtered);
+      }).catch(console.error);
+    }
+
+    if (mediumOptions.length === 0) {
+      getMediums().then(setMediumOptions).catch(console.error);
+    }
+    if (sourceOptions.length === 0) {
+      getSources().then(setSourceOptions).catch(console.error);
+    }
+    if (countryOptions.length === 0) {
+      getCountries().then(setCountryOptions).catch(console.error);
+    }
+    if (salesTeamOptions.length === 0) {
+      getSalesTeams().then(setSalesTeamOptions).catch(console.error);
+    }
+  }, [isEditing]);
+
+  // Fetch states whenever countryId changes, but only when editing
   useEffect(() => {
+    if (!isEditing || !countryId) {
+      setStateOptions([]);
+      return;
+    }
     getStates(countryId).then(setStateOptions).catch(console.error);
-  }, [countryId]);
+  }, [countryId, isEditing]);
 
   // Communication logs & Scheduled activities states
   const [logs, setLogs] = useState<any[]>([]);

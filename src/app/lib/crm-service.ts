@@ -50,7 +50,9 @@ import {
   createOdooContact,
   getOdooAllCrmActivities,
   getOdooRecentCrmMessages,
-  getOdooLeadTrackingMessages
+  getOdooLeadTrackingMessages,
+  getOdooNotificationRawData,
+  createInvoiceFromQuotation as createInvoiceFromQuotationOdoo
 } from '@/services/odoo';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -288,44 +290,48 @@ export async function updateLeadStatus(leadId: string, newStatus: LeadStatus): P
     }
   }
 
-  // Sync to Firestore if status updated successfully in Odoo
+  // Sync to Firestore if status updated successfully in Odoo (non-blocking)
   if (success) {
-    try {
-      const leadsRef = collection(db, "leads");
-      const q = query(leadsRef, where("odooLeadId", "==", leadId));
-      const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        const docId = querySnapshot.docs[0].id;
-        const leadDocRef = doc(db, "leads", docId);
-        await updateDoc(leadDocRef, {
-          status: newStatus,
-          updatedAt: new Date()
-        });
-        console.log(`Firestore lead document ${docId} status updated to ${newStatus}`);
-      } else {
-        console.log(`No Firestore lead document found matching odooLeadId: ${leadId}`);
+    (async () => {
+      try {
+        const leadsRef = collection(db, "leads");
+        const q = query(leadsRef, where("odooLeadId", "==", leadId));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const docId = querySnapshot.docs[0].id;
+          const leadDocRef = doc(db, "leads", docId);
+          await updateDoc(leadDocRef, {
+            status: newStatus,
+            updatedAt: new Date()
+          });
+          console.log(`Firestore lead document ${docId} status updated to ${newStatus}`);
+        } else {
+          console.log(`No Firestore lead document found matching odooLeadId: ${leadId}`);
+        }
+      } catch (fsError) {
+        console.warn("Failed to update Firestore lead status (Firebase might not be configured/online yet):", fsError);
       }
-    } catch (fsError) {
-      console.warn("Failed to update Firestore lead status (Firebase might not be configured/online yet):", fsError);
-    }
+    })();
   }
 
   if (success) {
     const updatedLead = await getLeadById(leadId);
     if (updatedLead && (newStatus === 'Won' || newStatus === 'Lost')) {
-      try {
-        await addDoc(collection(db, "notifications"), {
-          type: 'keputusan',
-          title: newStatus === 'Won' ? 'Mitra Berhasil Didapatkan! 🏆' : 'Lead Ditandai Gagal ❌',
-          body: `${updatedLead.namaLengkap} (${updatedLead.namaPerusahaan}) telah ditandai sebagai ${newStatus}.`,
-          createdAt: new Date(),
-          read: false,
-          color: newStatus === 'Won' ? 'text-primary bg-primary/10' : 'text-red-500 bg-red-500/10'
-        });
-      } catch (err) {
-        console.warn("Failed to create status notification:", err);
-      }
+      (async () => {
+        try {
+          await addDoc(collection(db, "notifications"), {
+            type: 'keputusan',
+            title: newStatus === 'Won' ? 'Mitra Berhasil Didapatkan! 🏆' : 'Lead Ditandai Gagal ❌',
+            body: `${updatedLead.namaLengkap} (${updatedLead.namaPerusahaan}) telah ditandai sebagai ${newStatus}.`,
+            createdAt: new Date(),
+            read: false,
+            color: newStatus === 'Won' ? 'text-primary bg-primary/10' : 'text-red-500 bg-red-500/10'
+          });
+        } catch (err) {
+          console.warn("Failed to create status notification:", err);
+        }
+      })();
     }
     return updatedLead;
   }
@@ -335,45 +341,47 @@ export async function updateLeadStatus(leadId: string, newStatus: LeadStatus): P
 export async function createLead(input: any): Promise<any> {
   const odooRes = await createOdooLead(input);
   if (odooRes && odooRes.success && odooRes.id) {
-    try {
-      await addDoc(collection(db, "leads"), {
-        namaLengkap: input.namaLengkap || "",
-        namaPerusahaan: input.namaPerusahaan || "",
-        email: input.email || "",
-        telepon: input.telepon || "",
-        kota: input.kota || "",
-        kategoriBisnis: input.kategoriBisnis || "Lainnya",
-        promoMinat: input.promoMinat || "",
-        estimasiVolume: input.estimasiVolume || "",
-        catatan: input.catatan || "",
-        status: "Baru",
-        sumber: input.sumber || "Langsung",
-        sudahSyncOdoo: true,
-        odooLeadId: String(odooRes.id),
-        expectedRevenue: input.expectedRevenue !== undefined ? (parseFloat(input.expectedRevenue) || 0) : 0,
-        probability: input.probability !== undefined ? (parseFloat(input.probability) || 0) : 0,
-        dateDeadline: input.dateDeadline || "",
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-      console.log(`Firestore lead document created successfully with odooLeadId: ${odooRes.id}`);
-      
-      // Also create a real-time notification
+    (async () => {
       try {
-        await addDoc(collection(db, "notifications"), {
-          type: 'lead_baru',
-          title: 'Lead Baru Masuk!',
-          body: `${input.namaLengkap || "Mitra Baru"} - ${input.namaPerusahaan || "Opportunity"}`,
+        await addDoc(collection(db, "leads"), {
+          namaLengkap: input.namaLengkap || "",
+          namaPerusahaan: input.namaPerusahaan || "",
+          email: input.email || "",
+          telepon: input.telepon || "",
+          kota: input.kota || "",
+          kategoriBisnis: input.kategoriBisnis || "Lainnya",
+          promoMinat: input.promoMinat || "",
+          estimasiVolume: input.estimasiVolume || "",
+          catatan: input.catatan || "",
+          status: "Baru",
+          sumber: input.sumber || "Langsung",
+          sudahSyncOdoo: true,
+          odooLeadId: String(odooRes.id),
+          expectedRevenue: input.expectedRevenue !== undefined ? (parseFloat(input.expectedRevenue) || 0) : 0,
+          probability: input.probability !== undefined ? (parseFloat(input.probability) || 0) : 0,
+          dateDeadline: input.dateDeadline || "",
           createdAt: new Date(),
-          read: false,
-          color: 'text-blue-500 bg-blue-500/10'
+          updatedAt: new Date()
         });
-      } catch (notifErr) {
-        console.warn("Failed to create notification:", notifErr);
+        console.log(`Firestore lead document created successfully with odooLeadId: ${odooRes.id}`);
+        
+        // Also create a real-time notification
+        try {
+          await addDoc(collection(db, "notifications"), {
+            type: 'lead_baru',
+            title: 'Lead Baru Masuk!',
+            body: `${input.namaLengkap || "Mitra Baru"} - ${input.namaPerusahaan || "Opportunity"}`,
+            createdAt: new Date(),
+            read: false,
+            color: 'text-blue-500 bg-blue-500/10'
+          });
+        } catch (notifErr) {
+          console.warn("Failed to create notification:", notifErr);
+        }
+      } catch (fsError) {
+        console.warn("Failed to create Firestore lead document (Firebase might not be configured/online yet):", fsError);
       }
-    } catch (fsError) {
-      console.warn("Failed to create Firestore lead document (Firebase might not be configured/online yet):", fsError);
-    }
+    })();
   }
   return odooRes;
 }
@@ -387,56 +395,58 @@ export async function updateLeadDetails(leadId: string, updates: Partial<Lead>):
     console.error("Failed to update lead details in Odoo:", odooRes.error);
   }
 
-  // 2. Sync to Firestore
-  try {
-    const leadsRef = collection(db, "leads");
-    const q = query(leadsRef, where("odooLeadId", "==", leadId));
-    const querySnapshot = await getDocs(q);
-    
-    const fsUpdates: any = {
-      updatedAt: new Date()
-    };
-    if (updates.namaLengkap !== undefined) fsUpdates.namaLengkap = updates.namaLengkap;
-    if (updates.namaPerusahaan !== undefined) fsUpdates.namaPerusahaan = updates.namaPerusahaan;
-    if (updates.email !== undefined) fsUpdates.email = updates.email;
-    if (updates.telepon !== undefined) fsUpdates.telepon = updates.telepon;
-    if (updates.kota !== undefined) fsUpdates.kota = updates.kota;
-    if (updates.kategoriBisnis !== undefined) fsUpdates.kategoriBisnis = updates.kategoriBisnis;
-    if (updates.catatan !== undefined) fsUpdates.catatan = updates.catatan;
-    if (updates.catatanInternal !== undefined) fsUpdates.catatanInternal = updates.catatanInternal;
-    if (updates.street !== undefined) fsUpdates.street = updates.street;
-    if (updates.street2 !== undefined) fsUpdates.street2 = updates.street2;
-    if (updates.zip !== undefined) fsUpdates.zip = updates.zip;
-    if (updates.stateId !== undefined) fsUpdates.stateId = updates.stateId;
-    if (updates.stateName !== undefined) fsUpdates.stateName = updates.stateName;
-    if (updates.countryId !== undefined) fsUpdates.countryId = updates.countryId;
-    if (updates.countryName !== undefined) fsUpdates.countryName = updates.countryName;
-    if (updates.jobPosition !== undefined) fsUpdates.jobPosition = updates.jobPosition;
-    if (updates.website !== undefined) fsUpdates.website = updates.website;
-    if (updates.salesTeamId !== undefined) fsUpdates.salesTeamId = updates.salesTeamId;
-    if (updates.salesTeamName !== undefined) fsUpdates.salesTeamName = updates.salesTeamName;
-    if (updates.campaignId !== undefined) fsUpdates.campaignId = updates.campaignId;
-    if (updates.campaignName !== undefined) fsUpdates.campaignName = updates.campaignName;
-    if (updates.mediumId !== undefined) fsUpdates.mediumId = updates.mediumId;
-    if (updates.mediumName !== undefined) fsUpdates.mediumName = updates.mediumName;
-    if (updates.sourceId !== undefined) fsUpdates.sourceId = updates.sourceId;
-    if (updates.sourceName !== undefined) fsUpdates.sourceName = updates.sourceName;
-    if (updates.referred !== undefined) fsUpdates.referred = updates.referred;
-    if (updates.promoMinat !== undefined) fsUpdates.promoMinat = updates.promoMinat;
-    if (updates.estimasiVolume !== undefined) fsUpdates.estimasiVolume = updates.estimasiVolume;
-    if (updates.expectedRevenue !== undefined) fsUpdates.expectedRevenue = updates.expectedRevenue;
-    if (updates.probability !== undefined) fsUpdates.probability = updates.probability;
-    if (updates.dateDeadline !== undefined) fsUpdates.dateDeadline = updates.dateDeadline;
+  // 2. Sync to Firestore (non-blocking)
+  (async () => {
+    try {
+      const leadsRef = collection(db, "leads");
+      const q = query(leadsRef, where("odooLeadId", "==", leadId));
+      const querySnapshot = await getDocs(q);
+      
+      const fsUpdates: any = {
+        updatedAt: new Date()
+      };
+      if (updates.namaLengkap !== undefined) fsUpdates.namaLengkap = updates.namaLengkap;
+      if (updates.namaPerusahaan !== undefined) fsUpdates.namaPerusahaan = updates.namaPerusahaan;
+      if (updates.email !== undefined) fsUpdates.email = updates.email;
+      if (updates.telepon !== undefined) fsUpdates.telepon = updates.telepon;
+      if (updates.kota !== undefined) fsUpdates.kota = updates.kota;
+      if (updates.kategoriBisnis !== undefined) fsUpdates.kategoriBisnis = updates.kategoriBisnis;
+      if (updates.catatan !== undefined) fsUpdates.catatan = updates.catatan;
+      if (updates.catatanInternal !== undefined) fsUpdates.catatanInternal = updates.catatanInternal;
+      if (updates.street !== undefined) fsUpdates.street = updates.street;
+      if (updates.street2 !== undefined) fsUpdates.street2 = updates.street2;
+      if (updates.zip !== undefined) fsUpdates.zip = updates.zip;
+      if (updates.stateId !== undefined) fsUpdates.stateId = updates.stateId;
+      if (updates.stateName !== undefined) fsUpdates.stateName = updates.stateName;
+      if (updates.countryId !== undefined) fsUpdates.countryId = updates.countryId;
+      if (updates.countryName !== undefined) fsUpdates.countryName = updates.countryName;
+      if (updates.jobPosition !== undefined) fsUpdates.jobPosition = updates.jobPosition;
+      if (updates.website !== undefined) fsUpdates.website = updates.website;
+      if (updates.salesTeamId !== undefined) fsUpdates.salesTeamId = updates.salesTeamId;
+      if (updates.salesTeamName !== undefined) fsUpdates.salesTeamName = updates.salesTeamName;
+      if (updates.campaignId !== undefined) fsUpdates.campaignId = updates.campaignId;
+      if (updates.campaignName !== undefined) fsUpdates.campaignName = updates.campaignName;
+      if (updates.mediumId !== undefined) fsUpdates.mediumId = updates.mediumId;
+      if (updates.mediumName !== undefined) fsUpdates.mediumName = updates.mediumName;
+      if (updates.sourceId !== undefined) fsUpdates.sourceId = updates.sourceId;
+      if (updates.sourceName !== undefined) fsUpdates.sourceName = updates.sourceName;
+      if (updates.referred !== undefined) fsUpdates.referred = updates.referred;
+      if (updates.promoMinat !== undefined) fsUpdates.promoMinat = updates.promoMinat;
+      if (updates.estimasiVolume !== undefined) fsUpdates.estimasiVolume = updates.estimasiVolume;
+      if (updates.expectedRevenue !== undefined) fsUpdates.expectedRevenue = updates.expectedRevenue;
+      if (updates.probability !== undefined) fsUpdates.probability = updates.probability;
+      if (updates.dateDeadline !== undefined) fsUpdates.dateDeadline = updates.dateDeadline;
 
-    if (!querySnapshot.empty) {
-      const docId = querySnapshot.docs[0].id;
-      const leadDocRef = doc(db, "leads", docId);
-      await updateDoc(leadDocRef, fsUpdates);
-      console.log(`Firestore lead document ${docId} details updated successfully.`);
+      if (!querySnapshot.empty) {
+        const docId = querySnapshot.docs[0].id;
+        const leadDocRef = doc(db, "leads", docId);
+        await updateDoc(leadDocRef, fsUpdates);
+        console.log(`Firestore lead document ${docId} details updated successfully.`);
+      }
+    } catch (fsError) {
+      console.warn("Failed to update Firestore lead details:", fsError);
     }
-  } catch (fsError) {
-    console.warn("Failed to update Firestore lead details:", fsError);
-  }
+  })();
 
   return await getLeadById(leadId);
 }
@@ -839,6 +849,14 @@ export async function cancelQuotation(id: string) {
   return await cancelOdooQuotation(parseInt(id, 10));
 }
 
+export async function createInvoiceFromQuotation(
+  quotationId: string,
+  invoiceType: 'regular' | 'percentage' | 'fixed',
+  downPaymentValue?: number
+) {
+  return await createInvoiceFromQuotationOdoo(parseInt(quotationId, 10), invoiceType, downPaymentValue);
+}
+
 export async function getPaymentTerms() {
   const rawTerms = await getOdooPaymentTerms();
   return rawTerms.map((t: any) => ({
@@ -871,9 +889,10 @@ export async function getOdooNotifications(): Promise<OdooNotification[]> {
   const todayStr = today.toISOString().split('T')[0];
   const notifications: OdooNotification[] = [];
 
-  // 1. Fetch all pending CRM activities
   try {
-    const activities = await getOdooAllCrmActivities();
+    const { activities = [], trackingMsgs = [], leads: rawLeads = [] } = await getOdooNotificationRawData();
+
+    // 1. Process pending CRM activities
     for (const act of activities) {
       const deadline = act.date_deadline ? String(act.date_deadline) : '';
       const isOverdue = deadline && deadline < todayStr;
@@ -909,13 +928,8 @@ export async function getOdooNotifications(): Promise<OdooNotification[]> {
         author: userName
       });
     }
-  } catch (e) {
-    console.warn('Failed to fetch Odoo activities for notifications:', e);
-  }
 
-  // 2. Fetch recent stage-change tracking messages
-  try {
-    const trackingMsgs = await getOdooLeadTrackingMessages();
+    // 2. Process stage-change tracking messages
     for (const msg of trackingMsgs) {
       const recordName = msg.record_name ? String(msg.record_name) : `Lead #${msg.res_id}`;
       const bodyText = msg.body ? String(msg.body).replace(/<[^>]*>/g, '').trim() : 'Perubahan stage';
@@ -933,13 +947,9 @@ export async function getOdooNotifications(): Promise<OdooNotification[]> {
         author: authorName
       });
     }
-  } catch (e) {
-    console.warn('Failed to fetch tracking messages for notifications:', e);
-  }
 
-  // 3. Fetch recent new leads (created in last 7 days)
-  try {
-    const leads = await getLeads();
+    // 3. Process new leads created in last 7 days
+    const leads = rawLeads.map(mapOdooToLead);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const recentLeads = leads.filter(l => {
       if (!l.createdAt) return false;
@@ -957,8 +967,8 @@ export async function getOdooNotifications(): Promise<OdooNotification[]> {
         date: lead.createdAt
       });
     }
-  } catch (e) {
-    console.warn('Failed to fetch new leads for notifications:', e);
+  } catch (error) {
+    console.warn('Failed to fetch Odoo notifications raw data:', error);
   }
 
   // Sort by date desc
